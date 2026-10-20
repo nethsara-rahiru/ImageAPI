@@ -14,10 +14,12 @@ export function setup(t, options = {}) {
   const calls = [];
   const generateImage =
     options.generateImage ||
-    async function (key, body) {
-      calls.push({ key, body });
-      return { encoded: png.toString('base64'), width: 120, height: 60 };
-    };
+    (options.fetchImpl
+      ? undefined
+      : async function (key, body) {
+          calls.push({ key, body });
+          return { encoded: png.toString('base64'), width: 120, height: 60 };
+        });
   const runtime = createApp({
     ...options,
     generateImage,

@@ -366,3 +366,36 @@ test('SVG and GIF uploads are rejected before unsupported decoders run', async (
       415,
     );
 });
+
+test('OpenAI quota diagnosis survives generation, request IDs, and usage logging', async (t) => {
+  const env = setup(t, {
+    fetchImpl: async () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            code: 'credit_balance_exhausted',
+            type: 'insufficient_quota',
+            message: 'sk-do-not-expose',
+          },
+        }),
+        {
+          status: 429,
+          headers: { 'Content-Type': 'application/json', 'X-Request-ID': 'req_upstream_test' },
+        },
+      ),
+  });
+  const account = await register(env);
+  await connect(env, account);
+  const result = await session(env.agent, account, 'post', '/v1/images/generations').send({
+    prompt: 'cat',
+  });
+  assert.equal(result.status, 429);
+  assert.match(result.body.detail, /credit_balance_exhausted/);
+  assert.ok(!result.text.includes('sk-do-not-expose'));
+  assert.match(result.headers['x-request-id'], /^req_/);
+  assert.equal(result.headers['x-provider-request-id'], 'req_upstream_test');
+  assert.equal(result.headers['retry-after'], undefined);
+  const usage = (await env.agent.get('/api/usage')).body;
+  assert.equal(usage.summary.used, 0);
+  assert.equal(usage.requests[0].error_code, 'credit_balance_exhausted');
+});

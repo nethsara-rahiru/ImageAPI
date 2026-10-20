@@ -212,3 +212,19 @@ With an installed Chromium, set `IMAGEAPI_CHROMIUM_PATH=/usr/bin/chromium`. No P
 Backend coverage includes account isolation, password/session/recovery behavior, encryption/tamper checks, key lifecycle, quotas, concurrent reservations, UTC resets, upload limits, provider protocols/error redaction, API/static routes, and real legacy migration fixtures. Browser coverage includes signup, credential handoff, settings, playground/download, bearer requests, actual usage changes, key revocation, recovery/login, mobile layouts, and automated accessibility checks.
 
 Use `npm run format` or `npm run format:check` for formatting. CI runs Node syntax, backend, and browser tests. Real provider calls still require valid account-owned keys and were not made during development. Paid plans remain previews with no checkout or subscription activation.
+
+## OpenAI returns HTTP 429 although ImageAPI usage is below its limit
+
+ImageAPI's monthly image allowance and OpenAI's API billing/rate limits are independent. A saved key is not proof of available API credits or permission to use every image model. ChatGPT subscriptions and API billing are also separate.
+
+ImageAPI classifies recognized OpenAI error codes without forwarding raw provider error messages:
+
+- `credit_balance_exhausted`: check the key-owning organization's prepaid API credits.
+- `project_spend_limit_exceeded` / `organization_spend_limit_exceeded`: review the enforced spend limit for that project or organization.
+- `organization_usage_limit_exceeded`: review the organization’s OpenAI-approved usage limit.
+- `insufficient_quota` / billing errors: check API billing, credits, and project/organization limits; a retry alone does not restore quota.
+- `rate_limit_exceeded` / `slow_down`: a temporary rate limit; check the model/project rate limits and honor a valid provider `Retry-After` header.
+
+Specific codes take precedence over the broader `insufficient_quota` type. Unknown errors remain generic rather than guessing a cause. Diagnostic bodies are bounded and raw messages/credentials are never exposed. Recognized codes are recorded in request history, and a valid upstream request ID is returned in `X-Provider-Request-ID`. No automatic retries or paid test calls are made.
+
+See [OpenAI’s 429 troubleshooting guide](https://help.openai.com/en/articles/5955604-troubleshooting-api-rate-limits-and-429-errors) and [separate ChatGPT/API billing](https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform). Earlier generic 429 records cannot be retroactively classified; update the app and inspect the next error.

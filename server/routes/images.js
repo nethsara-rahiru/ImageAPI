@@ -22,7 +22,13 @@ export function images(ctx) {
     try {
       image = await ctx.generateImage(key, body);
     } catch (error) {
-      finish(ctx, requestId, 'failed', performance.now() - started, String(error.status || 500));
+      finish(
+        ctx,
+        requestId,
+        'failed',
+        performance.now() - started,
+        error.providerCode || String(error.status || 500),
+      );
       if (error instanceof HttpError) throw error;
       throw new HttpError(500, 'Generation failed unexpectedly');
     }

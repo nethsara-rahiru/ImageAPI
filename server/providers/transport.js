@@ -1,6 +1,7 @@
 import { fetch, EnvHttpProxyAgent } from 'undici';
 import { HttpError } from '../lib/errors.js';
 import { providerError } from './errors.js';
+import { errorPayload } from './error-response.js';
 export function createTransport(config, fetchImpl) {
   const dispatcher = fetchImpl ? null : new EnvHttpProxyAgent();
   const request = fetchImpl || fetch;
@@ -18,8 +19,9 @@ export function createTransport(config, fetchImpl) {
           ...(dispatcher ? { dispatcher } : {}),
         });
         if (!response.ok) {
-          await response.body?.cancel();
-          throw providerError(response.status);
+          const payload = await errorPayload(response);
+          const provider = new URL(url).hostname === 'api.openai.com' ? 'openai' : 'provider';
+          throw providerError(response.status, { provider, payload, headers: response.headers });
         }
         const advertised = Number(response.headers.get('content-length'));
         if (advertised > config.providerResponseLimit) {

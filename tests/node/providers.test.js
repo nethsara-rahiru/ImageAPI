@@ -143,3 +143,93 @@ test('normalization strips metadata and limits decoded image pixels', async () =
   assert.equal(output.width, 120);
   await assert.rejects(normalizeImage(payload, { ...config, maxPixels: 100 }), { status: 502 });
 });
+
+for (const code of [
+  'credit_balance_exhausted',
+  'organization_usage_limit_exceeded',
+  'organization_spend_limit_exceeded',
+  'project_spend_limit_exceeded',
+  'billing_hard_limit_reached',
+  'billing_not_active',
+  'insufficient_quota',
+])
+  test(`OpenAI quota errors are identified: ${code}`, async () => {
+    const transport = createTransport(config, async () =>
+      json(
+        { error: { code, type: 'insufficient_quota', message: 'sensitive sk-provider-secret' } },
+        429,
+      ),
+    );
+    await assert.rejects(
+      transport.post('https://api.openai.com/v1/images/generations', {}, {}),
+      (error) => {
+        assert.equal(error.status, 429);
+        assert.equal(error.providerCode, code);
+        assert.ok(error.detail.includes(code));
+        assert.ok(error.detail.includes('separate'));
+        assert.ok(!error.detail.includes('sensitive'));
+        assert.equal(error.headers['Retry-After'], undefined);
+        return true;
+      },
+    );
+  });
+test('OpenAI temporary rate limit honors Retry-After and safe upstream request ID', async () => {
+  const transport = createTransport(
+    config,
+    async () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            code: 'rate_limit_exceeded',
+            type: 'insufficient_quota',
+            message: 'secret body',
+          },
+        }),
+        { status: 429, headers: { 'Retry-After': '12.5', 'X-Request-ID': 'req_openai_123' } },
+      ),
+  );
+  await assert.rejects(
+    transport.post('https://api.openai.com/v1/images/generations', {}, {}),
+    (error) =>
+      error.status === 429 &&
+      error.providerCode === 'rate_limit_exceeded' &&
+      error.headers['Retry-After'] === '13' &&
+      error.headers['X-Provider-Request-ID'] === 'req_openai_123' &&
+      !error.detail.includes('secret body'),
+  );
+});
+test('OpenAI type fallback is recognized when code is absent', async () => {
+  const transport = createTransport(config, async () =>
+    json({ error: { type: 'insufficient_quota' } }, 429),
+  );
+  await assert.rejects(
+    transport.post('https://api.openai.com/v1/images/generations', {}, {}),
+    (error) => error.providerCode === 'insufficient_quota',
+  );
+});
+test('malformed, oversized, and non-JSON error bodies retain sanitized status mapping', async () => {
+  for (const value of [
+    'not JSON',
+    'x'.repeat(20000),
+    JSON.stringify({ error: { code: 'secret-unknown-code', message: 'sk-do-not-expose' } }),
+  ]) {
+    const transport = createTransport(config, async () => new Response(value, { status: 429 }));
+    await assert.rejects(
+      transport.post('https://api.openai.com/v1/images/generations', {}, {}),
+      (error) =>
+        error.status === 429 &&
+        !error.detail.includes('sk-do-not-expose') &&
+        !error.detail.includes('secret-unknown-code'),
+    );
+  }
+});
+test('non-OpenAI providers do not use OpenAI-specific billing classifications', async () => {
+  const transport = createTransport(config, async () =>
+    json({ error: { code: 'credit_balance_exhausted' } }, 429),
+  );
+  await assert.rejects(
+    transport.post('https://fal.run/fal-ai/flux/schnell', {}, {}),
+    (error) =>
+      error.status === 429 && error.providerCode === undefined && !error.detail.includes('OpenAI'),
+  );
+});
