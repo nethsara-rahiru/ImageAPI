@@ -1,0 +1,19 @@
+:root {
+  --blue: #2168d2;
+  --blue-dark: #1859b8;
+  --blue-soft: #eaf3ff;
+  --sky: #caeaff;
+  --ink: #162c45;
+  --muted: #5a6e85;
+  --line: #e2eaf2;
+  --surface: #fff;
+  --bg: #f6f9fd;
+  --green: #0b7457;
+  --green-soft: #e9f8f1;
+  --danger: #b33342;
+  --danger-soft: #fff1f2;
+  --radius: 16px;
+  --shadow: 0 8px 30px #173b6810;
+  --font: Inter, 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+}

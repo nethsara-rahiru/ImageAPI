@@ -1,0 +1,7 @@
+{
+  "password": "legacy-password-123",
+  "password_hash": "AAECAwQFBgcICQoLDA0OD6yM7GIv1ARU0PnSXOInBxLQVDgGNgeLtBFsLKnBUx1urWT8jR9Wq+WcrWN4t1o+/b2ku6G55Pr8K86WsFE/eoo=",
+  "encryption_key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+  "provider_key": "sk-legacy-fixture-only",
+  "encrypted_key": "gAAAAABq1vrdrEBLwLz8PPCYHq209oVyE6jm5G_4jl5vky83r0rUIfAF8zDfQ7aYRtbg7-jpGSaOYQwwUy2Rj_xK8-ZbqKPFkGVgDVt3RVebyC-8ZMArvz4="
+}

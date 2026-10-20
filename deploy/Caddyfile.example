@@ -1,0 +1,10 @@
+# Replace the hostname and set the same HTTPS origin in .env.
+# Preserve other sites in your existing Caddy configuration.
+images.example.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8080 {
+        transport http {
+            response_header_timeout 200s
+        }
+    }
+}
