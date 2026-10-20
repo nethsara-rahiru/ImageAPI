@@ -233,3 +233,58 @@ test('non-OpenAI providers do not use OpenAI-specific billing classifications', 
       error.status === 429 && error.providerCode === undefined && !error.detail.includes('OpenAI'),
   );
 });
+
+test('each provider distinguishes authentication from access denial without exposing messages', async () => {
+  for (const [url, name] of [
+    ['https://api.openai.com/v1/images/generations', 'OpenAI'],
+    [
+      'https://generativelanguage.googleapis.com/v1beta/models/test:generateContent',
+      'Google Gemini',
+    ],
+    ['https://fal.run/fal-ai/flux/schnell', 'fal.ai'],
+  ]) {
+    for (const status of [401, 403]) {
+      const transport = createTransport(config, async () =>
+        json({ error: { message: 'secret-key-value' } }, status),
+      );
+      await assert.rejects(transport.post(url, {}, {}), (error) => {
+        assert.equal(error.status, 424);
+        assert.ok(error.detail.includes(name));
+        assert.ok(error.detail.includes(`HTTP ${status}`));
+        assert.ok(error.detail.includes(status === 401 ? 'authentication' : 'denied'));
+        assert.ok(!error.detail.includes('secret-key-value'));
+        return true;
+      });
+    }
+  }
+});
+
+test('Gemini structured key restrictions produce a safe actionable diagnosis', async () => {
+  const transport = createTransport(config, async () =>
+    json(
+      {
+        error: {
+          code: 403,
+          message: 'secret-key-value',
+          details: [
+            { reason: 'API_KEY_HTTP_REFERRER_BLOCKED', metadata: { key: 'secret-key-value' } },
+          ],
+        },
+      },
+      403,
+    ),
+  );
+  await assert.rejects(
+    transport.post(
+      'https://generativelanguage.googleapis.com/v1beta/models/test:generateContent',
+      {},
+      {},
+    ),
+    (error) => {
+      assert.equal(error.providerCode, 'API_KEY_HTTP_REFERRER_BLOCKED');
+      assert.ok(error.detail.includes('browser referrer'));
+      assert.ok(!error.detail.includes('secret-key-value'));
+      return true;
+    },
+  );
+});

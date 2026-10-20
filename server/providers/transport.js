@@ -20,7 +20,12 @@ export function createTransport(config, fetchImpl) {
         });
         if (!response.ok) {
           const payload = await errorPayload(response);
-          const provider = new URL(url).hostname === 'api.openai.com' ? 'openai' : 'provider';
+          const provider =
+            {
+              'api.openai.com': 'openai',
+              'generativelanguage.googleapis.com': 'gemini',
+              'fal.run': 'fal',
+            }[new URL(url).hostname] || 'provider';
           throw providerError(response.status, { provider, payload, headers: response.headers });
         }
         const advertised = Number(response.headers.get('content-length'));

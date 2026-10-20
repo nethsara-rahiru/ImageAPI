@@ -32,7 +32,7 @@ function retryAfter(headers) {
 export function providerError(status, { provider = 'provider', payload, headers } = {}) {
   const code = payload?.error?.code;
   const type = payload?.error?.type;
-  const name = provider === 'openai' ? 'OpenAI' : 'Provider';
+  const name = { openai: 'OpenAI', gemini: 'Google Gemini', fal: 'fal.ai' }[provider] || 'Provider';
   let error;
   if (provider === 'openai' && [400, 429].includes(status)) {
     // Specific codes take precedence over OpenAI's broader insufficient_quota type.
@@ -59,8 +59,46 @@ export function providerError(status, { provider = 'provider', payload, headers 
     }
   }
   if (!error) {
-    if ([401, 403].includes(status))
-      error = new HttpError(424, `${name} rejected your key or model access. Check it in Settings`);
+    const hints =
+      provider === 'openai'
+        ? {
+            invalid_api_key:
+              'The saved OpenAI API key is invalid or revoked. Replace it in Settings with a key from the intended OpenAI API project.',
+            model_not_found:
+              'This OpenAI model does not exist or is unavailable to this API project. Check the selected model and project access.',
+            unsupported_country_region_territory:
+              'OpenAI does not support requests from this server’s country or region.',
+          }
+        : provider === 'gemini'
+          ? {
+              API_KEY_INVALID:
+                'Google rejected the saved Gemini API key. Replace it in Settings with a Gemini API key for the intended project.',
+              API_KEY_SERVICE_BLOCKED:
+                'Google API key restrictions block the Gemini API. Review API restrictions for this key.',
+              API_KEY_HTTP_REFERRER_BLOCKED:
+                'Google rejected this server request because the key has browser referrer restrictions. Use a key configured for server requests.',
+              API_KEY_IP_ADDRESS_BLOCKED:
+                'Google API key restrictions do not allow this VPS IP address. Review the key’s allowed server IPs.',
+              SERVICE_DISABLED:
+                'The Gemini API is disabled for this Google project. Enable the Generative Language API in that project.',
+            }
+          : {};
+    const recognized = [code, ...(payload?.error?.reasons || [])].find((value) =>
+      Object.hasOwn(hints, value),
+    );
+    if (recognized && [400, 401, 403, 404].includes(status)) {
+      error = new HttpError(424, `${hints[recognized]} (${recognized}; HTTP ${status})`);
+      error.providerCode = recognized;
+    } else if (status === 401)
+      error = new HttpError(
+        424,
+        `${name} rejected authentication (HTTP 401). Replace the saved ${name} key in Settings; use that provider’s API key, not your ImageAPI key.`,
+      );
+    else if (status === 403)
+      error = new HttpError(
+        424,
+        `${name} denied this request (HTTP 403). Check the selected model’s permissions, account eligibility, and API key restrictions for this VPS. A 403 alone does not establish that the key is invalid.`,
+      );
     else if (status === 429)
       error = new HttpError(
         429,
@@ -69,7 +107,7 @@ export function providerError(status, { provider = 'provider', payload, headers 
     else if ([400, 404, 422].includes(status))
       error = new HttpError(
         400,
-        'Provider rejected the prompt, model, or settings. Try different options',
+        `${name} rejected the prompt, model, or settings (HTTP ${status}). Check the selected model and options.`,
       );
     else error = new HttpError(502, 'The image provider is temporarily unavailable');
   }

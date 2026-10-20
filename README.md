@@ -228,3 +228,9 @@ ImageAPI classifies recognized OpenAI error codes without forwarding raw provide
 Specific codes take precedence over the broader `insufficient_quota` type. Unknown errors remain generic rather than guessing a cause. Diagnostic bodies are bounded and raw messages/credentials are never exposed. Recognized codes are recorded in request history, and a valid upstream request ID is returned in `X-Provider-Request-ID`. No automatic retries or paid test calls are made.
 
 See [OpenAI’s 429 troubleshooting guide](https://help.openai.com/en/articles/5955604-troubleshooting-api-rate-limits-and-429-errors) and [separate ChatGPT/API billing](https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform). Earlier generic 429 records cannot be retroactively classified; update the app and inspect the next error.
+
+## A provider rejects authentication or access
+
+Update the checkout and restart the running Node process before retrying. Errors now identify OpenAI, Google Gemini, or fal.ai and the upstream HTTP status. HTTP 401 means authentication was rejected; replace that provider’s saved credential in Settings, using its own API key rather than an ImageAPI bearer key. HTTP 403 means access was denied and can involve model permissions, account eligibility, server location, or key restrictions; it does not alone prove the key is invalid. Recognized OpenAI codes and Google structured restriction reasons receive specific guidance. Raw provider messages and key metadata are never returned to clients.
+
+A Gemini key restricted to browser HTTP referrers cannot authorize this backend’s requests; configure restrictions appropriate for your server. fal.ai requires a fal.ai key for FLUX models. Saving a credential stores it securely but does not verify provider access. Share only the resulting error text and selected provider/model when diagnosing failures, never the credential.

@@ -18,6 +18,12 @@ export async function errorPayload(response, limit = 16 * 1024) {
       error: {
         code: typeof payload?.error?.code === 'string' ? payload.error.code : undefined,
         type: typeof payload?.error?.type === 'string' ? payload.error.type : undefined,
+        reasons: Array.isArray(payload?.error?.details)
+          ? payload.error.details
+              .slice(0, 20)
+              .map((detail) => detail?.reason)
+              .filter((reason) => typeof reason === 'string')
+          : [],
       },
     };
   } catch {
