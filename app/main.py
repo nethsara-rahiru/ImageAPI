@@ -1,79 +1,80 @@
-"""Image transformations without persistent storage or external services."""
-from io import BytesIO
-import warnings
+"""Application factory and frontend delivery. Run with uvicorn app.main:app."""
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
-from fastapi.responses import Response
-from PIL import Image, ImageOps, UnidentifiedImageError
+from contextlib import asynccontextmanager
+from pathlib import Path
 
-app = FastAPI(title="ImageAPI", version="0.1.0", description="Generate AI images from prompts, or resize and convert uploads. Images are never stored.")
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-MAX_PIXELS = 20_000_000
-Image.MAX_IMAGE_PIXELS = MAX_PIXELS
-FORMATS = {"jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
+from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
+from app.config import Settings
+from app.errors import validation_error
+from app.middleware import security_middleware
+from app.database import initialize
+from app.security import load_cipher
+from app.generation import router as images
+from app.routes import accounts, dashboard, keys, transforms
 
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.post("/v1/images/transform", responses={200: {"content": {mime: {} for mime in FORMATS.values()}}, 413: {"description": "Image exceeds processing limits"}, 415: {"description": "Unsupported or invalid image"}})
-async def transform_image(
-    file: UploadFile = File(...),
-    width: int | None = Query(None, ge=1, le=4096),
-    height: int | None = Query(None, ge=1, le=4096),
-    format: str = Query("webp", pattern="^(jpeg|png|webp)$"),
-    quality: int = Query(85, ge=1, le=100),
-) -> Response:
-    """Fit within width/height, preserving aspect ratio without upscaling.
-
-    Accepts JPEG, PNG, and WebP. Animated inputs produce their first frame.
-    EXIF orientation is applied; source metadata is removed from the output.
-    """
-    try:
-        data = await file.read(MAX_UPLOAD_BYTES + 1)
-    finally:
-        await file.close()
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(413, "Upload must be 10 MiB or smaller")
-    if not data:
-        raise HTTPException(400, "Upload is empty")
-
-    # Keep CPU-bound decoding and encoding off the event loop.
-    from starlette.concurrency import run_in_threadpool
-    return await run_in_threadpool(_transform, data, width, height, format, quality)
+FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 
 
-def _transform(data: bytes, width: int | None, height: int | None, format: str, quality: int) -> Response:
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", Image.DecompressionBombWarning)
-            with Image.open(BytesIO(data)) as source:
-                if source.format not in {"JPEG", "PNG", "WEBP"}:
-                    raise HTTPException(415, "Supported input formats: JPEG, PNG, WebP")
-                if source.width * source.height > MAX_PIXELS:
-                    raise HTTPException(413, "Image must contain at most 20 million pixels")
-                image = ImageOps.exif_transpose(source).convert("RGBA")
-                image.thumbnail((width or image.width, height or image.height), Image.Resampling.LANCZOS)
-                if format == "jpeg":
-                    background = Image.new("RGB", image.size, "white")
-                    background.paste(image, mask=image.getchannel("A"))
-                    image = background
-                image.info.clear()
-                output = BytesIO()
-                image.save(output, format=format.upper(), quality=quality)
-                return Response(output.getvalue(), media_type=FORMATS[format], headers={
-                    "Content-Disposition": f'inline; filename="image.{format}"',
-                    "X-Image-Width": str(image.width),
-                    "X-Image-Height": str(image.height),
-                    "Cache-Control": "no-store",
-                    "X-Content-Type-Options": "nosniff",
-                })
-    except (Image.DecompressionBombError, Image.DecompressionBombWarning):
-        raise HTTPException(413, "Image must contain at most 20 million pixels")
-    except (UnidentifiedImageError, OSError, ValueError):
-        raise HTTPException(415, "Invalid or corrupt image")
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or Settings()
 
-from app.generation import router
-app.include_router(router)
+    @asynccontextmanager
+    async def lifespan(app):
+        initialize(settings.database)
+        app.state.cipher = load_cipher(settings)
+        yield
+
+    app = FastAPI(
+        title="ImageAPI",
+        version="0.2.0",
+        description="One API for image generation with your own provider keys.",
+        lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
+    )
+    app.state.settings = settings
+    app.add_exception_handler(RequestValidationError, validation_error)
+
+    app.middleware("http")(security_middleware(settings))
+
+    app.include_router(accounts.router)
+    app.include_router(keys.router)
+    app.include_router(dashboard.router)
+    app.include_router(images)
+    app.include_router(transforms.router)
+
+    @app.get("/health", tags=["System"])
+    def health():
+        return {"status": "ok", "version": "0.2.0"}
+
+    @app.get("/api/reference", include_in_schema=False)
+    def reference():
+        return RedirectResponse("/docs")
+
+    app.mount("/static", StaticFiles(directory=FRONTEND), name="static")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def frontend(path: str):
+        if path not in {
+            "",
+            "pricing",
+            "login",
+            "signup",
+            "recover",
+            "dashboard",
+            "api",
+            "playground",
+            "settings",
+            "docs",
+        }:
+            raise HTTPException(404, "Page not found")
+        return FileResponse(FRONTEND / "index.html", headers={"Cache-Control": "no-cache"})
+
+    return app
+
+
+app = create_app()

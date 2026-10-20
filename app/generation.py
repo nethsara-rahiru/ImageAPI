@@ -1,55 +1,95 @@
-"""Server-side OpenAI image generation."""
-import base64
-import os
-from typing import Literal
+"""Authenticated image generation using the caller's saved provider credential."""
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
-from openai import AsyncOpenAI, APIConnectionError, APIStatusError, APITimeoutError, RateLimitError
-from pydantic import BaseModel, Field
+import time
+from typing import Annotated, Literal
 
-router = APIRouter()
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from starlette.concurrency import run_in_threadpool
+
+from app.auth import Principal, generation_user, rate_limit
+from app.providers import generate
+from app.providers.catalog import PROVIDERS
+from app.routes.keys import read_provider_key
+from app.usage import finish, reserve
+
+router = APIRouter(tags=["Images"])
 
 
 class GenerationRequest(BaseModel):
-    prompt: str = Field(min_length=1, max_length=32000)
-    size: Literal["1024x1024", "1536x1024", "1024x1536", "auto"] = "1024x1024"
-    quality: Literal["low", "medium", "high", "auto"] = "auto"
+    model_config = ConfigDict(extra="forbid")
+
+    prompt: str = Field(min_length=1, max_length=12000)
+    provider: Literal["openai", "gemini", "fal"] = "openai"
+    model: str | None = Field(None, max_length=120)
+    size: Literal["1024x1024", "1536x1024", "1024x1536"] = "1024x1024"
+    quality: Literal["auto", "low", "medium", "high"] = "auto"
+
+    @field_validator("prompt")
+    @classmethod
+    def clean_prompt(cls, value):
+        if not value.strip():
+            raise ValueError("Prompt cannot be blank")
+        return value.strip()
+
+    @model_validator(mode="after")
+    def validate_options(self):
+        catalog = PROVIDERS[self.provider]
+        self.model = self.model or catalog["default_model"]
+        if self.model not in catalog["models"]:
+            raise ValueError("Model is not supported by this provider; see /api/catalog")
+        if self.quality not in catalog["qualities"]:
+            raise ValueError("This provider supports quality=auto only")
+        return self
 
 
-@router.post("/v1/images/generate", response_class=Response, responses={200: {"content": {"image/png": {}}}, 503: {"description": "Provider not configured or unavailable"}})
-async def generate_image(request: GenerationRequest) -> Response:
-    """Generate one PNG from a prompt. Requires server-side OPENAI_API_KEY.
+@router.post("/v1/images/generations")
+@router.post("/v1/images/generate", include_in_schema=False)
+async def generate_image(
+    body: GenerationRequest, request: Request, user: Annotated[Principal, Depends(generation_user)]
+):
+    """Generate one PNG. Authenticate with an ImageAPI bearer key.
 
-    Calls incur charges on the configured OpenAI account.
+    The account must have its own provider credential saved in Settings.
+    Response data uses base64 PNG; images and prompts are never persisted.
     """
-    if not request.prompt.strip():
-        raise HTTPException(422, "Prompt cannot be blank")
-    if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(503, "Set OPENAI_API_KEY on the server to enable generation")
+    settings = request.app.state.settings
+    await run_in_threadpool(rate_limit, request, "generation:" + user.user_id, 20, 60)
+    key = await run_in_threadpool(read_provider_key, request, user.user_id, body.provider)
+    request_id = await run_in_threadpool(reserve, settings, user, body)
+    start = time.monotonic()
     try:
-        async with AsyncOpenAI(timeout=180.0, max_retries=0) as client:
-            result = await client.images.generate(
-                model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1"),
-                prompt=request.prompt.strip(), size=request.size,
-                quality=request.quality, n=1, output_format="png",
-            )
-        if not result.data or not result.data[0].b64_json:
-            raise HTTPException(502, "Image provider returned no image")
-        content = base64.b64decode(result.data[0].b64_json, validate=True)
-    except RateLimitError:
-        raise HTTPException(429, "Image provider rate limit or quota exceeded")
-    except APITimeoutError:
-        raise HTTPException(504, "Image generation timed out")
-    except APIConnectionError:
-        raise HTTPException(503, "Image provider is unavailable")
-    except APIStatusError as exc:
-        if exc.status_code == 400:
-            raise HTTPException(400, "Image provider rejected the request; try another prompt or settings")
-        raise HTTPException(502, "Image provider request failed")
-    except (ValueError, TypeError):
-        raise HTTPException(502, "Image provider returned invalid image data")
-    return Response(content, media_type="image/png", headers={
-        "Cache-Control": "no-store", "Content-Disposition": 'inline; filename="generated.png"',
-        "X-Content-Type-Options": "nosniff",
-    })
+        encoded, width, height = await generate(key, body)
+    except HTTPException as exc:
+        await run_in_threadpool(
+            finish,
+            settings,
+            request_id,
+            "failed",
+            int((time.monotonic() - start) * 1000),
+            str(exc.status_code),
+        )
+        exc.headers = {**(exc.headers or {}), "X-Request-ID": request_id}
+        raise
+    except Exception:
+        await run_in_threadpool(
+            finish,
+            settings,
+            request_id,
+            "failed",
+            int((time.monotonic() - start) * 1000),
+            "internal_error",
+        )
+        raise HTTPException(
+            500, "Generation failed unexpectedly", headers={"X-Request-ID": request_id}
+        )
+    await run_in_threadpool(
+        finish, settings, request_id, "success", int((time.monotonic() - start) * 1000)
+    )
+    return {
+        "id": request_id,
+        "created": int(time.time()),
+        "provider": body.provider,
+        "model": body.model,
+        "data": [{"b64_json": encoded, "mime_type": "image/png", "width": width, "height": height}],
+    }

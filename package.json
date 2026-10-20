@@ -1,0 +1,15 @@
+{
+  "name": "imageapi-dev-tools",
+  "private": true,
+  "description": "Optional formatting and browser tests; the frontend needs no build step.",
+  "scripts": {
+    "format": "prettier --write frontend tests/browser playwright.config.js",
+    "format:check": "prettier --check frontend tests/browser playwright.config.js",
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "@axe-core/playwright": "^4.11.0",
+    "prettier": "^3.8.0"
+  }
+}
