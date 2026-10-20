@@ -17,6 +17,18 @@ export const providers = {
     sizes: ['1024x1024', '1536x1024', '1024x1536'],
     qualities: ['auto'],
   },
+  cloudflare: {
+    name: 'Cloudflare Workers AI',
+    description: 'FLUX Schnell with a daily free allowance from Cloudflare. Account limits apply.',
+    key_url: 'https://developers.cloudflare.com/workers-ai/get-started/rest-api/',
+    models: ['@cf/black-forest-labs/flux-1-schnell'],
+    default_model: '@cf/black-forest-labs/flux-1-schnell',
+    sizes: ['1024x1024'],
+    qualities: ['auto'],
+    prompt_limit: 2048,
+    size_note: 'Native square output. Actual pixel dimensions are returned with the image.',
+    requires_account_id: true,
+  },
   fal: {
     name: 'FLUX · fal.ai',
     description: 'Fast, expressive images with FLUX models.',

@@ -51,6 +51,7 @@ export async function render() {
             <span>YOUR FAVORITE MODELS. ONE PLACE.</span>
             <div class="provider-wordmark">${icon('openai')} OpenAI</div>
             <div class="provider-wordmark">${icon('gemini', 'gemini-star')} Gemini</div>
+            <div class="provider-wordmark">${icon('cloudflare')} Cloudflare</div>
             <div class="provider-wordmark">
               ${icon('fal')} FLUX <span class="small">via fal.ai</span>
             </div>
@@ -71,8 +72,8 @@ export async function render() {
                 <div class="feature-icon">${icon('key')}</div>
                 <h3>Your keys, connected.</h3>
                 <p>
-                  Bring credentials from OpenAI, Gemini, or fal.ai. Keep them encrypted in Settings
-                  and access them through your own ImageAPI key.
+                  Bring credentials from OpenAI, Gemini, fal.ai, or Cloudflare Workers AI. Keep them
+                  encrypted in Settings and access them through your own ImageAPI key.
                 </p>
               </article>
               <article class="feature">

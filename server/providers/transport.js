@@ -25,6 +25,7 @@ export function createTransport(config, fetchImpl) {
               'api.openai.com': 'openai',
               'generativelanguage.googleapis.com': 'gemini',
               'fal.run': 'fal',
+              'api.cloudflare.com': 'cloudflare',
             }[new URL(url).hostname] || 'provider';
           throw providerError(response.status, { provider, payload, headers: response.headers });
         }

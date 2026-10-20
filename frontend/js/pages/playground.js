@@ -110,6 +110,9 @@ export function bindPlayground(providers) {
     idea = 0;
   const update = () => {
     const provider = providers.find((p) => p.id === providerSelect.value);
+    prompt.maxLength = provider.prompt_limit || 12000;
+    document.querySelector('#prompt-count').textContent =
+      `${prompt.value.length.toLocaleString()} / ${prompt.maxLength.toLocaleString()}`;
     model.innerHTML = provider.models
       .map(
         (value) =>
@@ -138,7 +141,7 @@ export function bindPlayground(providers) {
     quality.disabled = provider.qualities.length === 1;
     status.classList.toggle('ready', provider.connected);
     status.innerHTML = provider.connected
-      ? `${icon('check')} Key saved · verified when you generate`
+      ? `${icon('check')} Key saved · verified when you generate${provider.size_note ? ' · ' + escape(provider.size_note) : ''}`
       : `${icon('info')} <a class="text-link" href="/settings" data-link>Add your ${escape(provider.name)} key in Settings</a>`;
     button.disabled = !provider.connected || busy;
   };
@@ -146,7 +149,7 @@ export function bindPlayground(providers) {
   update();
   prompt.addEventListener('input', () => {
     document.querySelector('#prompt-count').textContent =
-      `${prompt.value.length.toLocaleString()} / 12,000`;
+      `${prompt.value.length.toLocaleString()} / ${prompt.maxLength.toLocaleString()}`;
   });
   form.querySelector('[data-inspiration]').addEventListener('click', () => {
     prompt.value = prompts[idea++ % prompts.length];

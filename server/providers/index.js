@@ -1,9 +1,10 @@
 import { openai } from './openai.js';
 import { gemini } from './gemini.js';
+import { cloudflare } from './cloudflare.js';
 import { fal } from './fal.js';
 import { normalizeImage } from '../services/images.js';
 import { HttpError } from '../lib/errors.js';
-const adapters = { openai, gemini, fal };
+const adapters = { openai, gemini, fal, cloudflare };
 export function createGenerator(transport, config) {
   return async (key, body) => {
     try {

@@ -58,6 +58,17 @@ export function keys(ctx) {
     if (!Object.hasOwn(providers, provider)) throw new HttpError(404, 'Unknown provider');
     const body = parse(
       z.object({
+        ...(provider === 'cloudflare'
+          ? {
+              account_id: z
+                .string()
+                .trim()
+                .regex(
+                  /^[a-fA-F0-9]{32}$/,
+                  'Cloudflare Account ID must contain 32 hexadecimal characters',
+                ),
+            }
+          : {}),
         api_key: z
           .string()
           .min(8)
@@ -66,7 +77,11 @@ export function keys(ctx) {
       }),
       req.body,
     );
-    const encrypted = ctx.encryption.encrypt(body.api_key),
+    const credential =
+      provider === 'cloudflare'
+        ? JSON.stringify({ api_key: body.api_key, account_id: body.account_id })
+        : body.api_key;
+    const encrypted = ctx.encryption.encrypt(credential),
       hint = '••••' + body.api_key.slice(-4);
     ctx.db
       .prepare(

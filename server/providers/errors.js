@@ -32,7 +32,10 @@ function retryAfter(headers) {
 export function providerError(status, { provider = 'provider', payload, headers } = {}) {
   const code = payload?.error?.code;
   const type = payload?.error?.type;
-  const name = { openai: 'OpenAI', gemini: 'Google Gemini', fal: 'fal.ai' }[provider] || 'Provider';
+  const name =
+    { openai: 'OpenAI', gemini: 'Google Gemini', fal: 'fal.ai', cloudflare: 'Cloudflare' }[
+      provider
+    ] || 'Provider';
   let error;
   if (provider === 'openai' && [400, 429].includes(status)) {
     // Specific codes take precedence over OpenAI's broader insufficient_quota type.
@@ -93,6 +96,11 @@ export function providerError(status, { provider = 'provider', payload, headers 
       error = new HttpError(
         424,
         `${name} rejected authentication (HTTP 401). Replace the saved ${name} key in Settings; use that provider’s API key, not your ImageAPI key.`,
+      );
+    else if (status === 403 && provider === 'cloudflare')
+      error = new HttpError(
+        424,
+        'Cloudflare denied this request (HTTP 403). Check the saved Account ID and use a token with Workers AI Read and Edit permissions for that account. Review any token IP restrictions.',
       );
     else if (status === 403)
       error = new HttpError(

@@ -102,8 +102,18 @@ export const openapi = {
         additionalProperties: false,
         required: ['prompt'],
         properties: {
-          prompt: { type: 'string', minLength: 1, maxLength: 12000 },
-          provider: { type: 'string', enum: ['openai', 'gemini', 'fal'], default: 'openai' },
+          prompt: {
+            type: 'string',
+            minLength: 1,
+            maxLength: 12000,
+            description:
+              'Cloudflare prompts are limited to 2048 characters; other providers allow 12000.',
+          },
+          provider: {
+            type: 'string',
+            enum: ['openai', 'gemini', 'fal', 'cloudflare'],
+            default: 'openai',
+          },
           model: {
             type: 'string',
             description: 'Model from /api/catalog; defaults to provider default',
@@ -112,6 +122,8 @@ export const openapi = {
             type: 'string',
             enum: ['1024x1024', '1536x1024', '1024x1536'],
             default: '1024x1024',
+            description:
+              'Cloudflare accepts native square output only (1024x1024); actual dimensions are returned in the response.',
           },
           quality: {
             type: 'string',

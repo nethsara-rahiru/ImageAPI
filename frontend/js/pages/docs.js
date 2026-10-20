@@ -30,7 +30,7 @@ export async function render() {
             </li>
             <li>
               Open <a class="text-link" href="/settings" data-link>Settings</a> and add a key from
-              OpenAI, Google Gemini, or fal.ai.
+              OpenAI, Google Gemini, fal.ai, or Cloudflare Workers AI.
             </li>
             <li>
               Send this request from your server. Replace <code>YOUR_IMAGEAPI_KEY</code> with your
@@ -82,8 +82,8 @@ export async function render() {
                   <td><code>provider</code></td>
                   <td>string · openai</td>
                   <td>
-                    <code>openai</code>, <code>gemini</code>, or <code>fal</code>. Connect that
-                    provider in Settings first.
+                    <code>openai</code>, <code>gemini</code>, <code>fal</code>, or
+                    <code>cloudflare</code>. Connect that provider in Settings first.
                   </td>
                 </tr>
                 <tr>
@@ -107,7 +107,7 @@ export async function render() {
                   <td>string · auto</td>
                   <td>
                     OpenAI: <code>auto</code>, <code>low</code>, <code>medium</code>,
-                    <code>high</code>. Gemini and fal.ai: <code>auto</code> only.
+                    <code>high</code>. Gemini, fal.ai, and Cloudflare: <code>auto</code> only.
                   </td>
                 </tr>
               </tbody>
@@ -146,12 +146,29 @@ export async function render() {
                   <td><code>fal-ai/flux/schnell</code><br /><code>fal-ai/flux/dev</code></td>
                   <td><code>fal-ai/flux/schnell</code></td>
                 </tr>
+                <tr>
+                  <td>Cloudflare Workers AI</td>
+                  <td><code>@cf/black-forest-labs/flux-1-schnell</code></td>
+                  <td><code>@cf/black-forest-labs/flux-1-schnell</code></td>
+                </tr>
               </tbody>
             </table>
           </div>
           <p>
-            <code>GET /api/catalog</code> returns the current supported catalog. Model availability
-            depends on your provider account and region. Provider references:
+            Cloudflare setup: open Workers AI → Use REST API in your Cloudflare dashboard, create a
+            token with Workers AI Read and Edit permissions, then save that token and your
+            32-character Account ID in Settings. Use <code>provider: "cloudflare"</code>. FLUX
+            Schnell accepts up to 2,048 prompt characters, <code>quality: "auto"</code>, and native
+            square output (<code>size: "1024x1024"</code>); actual dimensions appear in the
+            response. Cloudflare’s daily free allowance and ImageAPI’s monthly allowance are
+            separate.
+            <a
+              href="https://developers.cloudflare.com/workers-ai/get-started/rest-api/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Cloudflare setup guide</a
+            >. <code>GET /api/catalog</code> returns the current supported catalog. Model
+            availability depends on your provider account and region. Provider references:
             <a
               class="text-link"
               href="https://platform.openai.com/docs/guides/image-generation"

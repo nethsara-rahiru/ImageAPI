@@ -39,7 +39,7 @@ export function historyTable(
                   <div class="table-secondary"><code>${escape(row.id)}</code></div>
                 </td>
                 <td>
-                  ${escape(row.provider === 'fal' ? 'fal.ai' : row.provider === 'gemini' ? 'Gemini' : 'OpenAI')}
+                  ${escape({ fal: 'fal.ai', gemini: 'Gemini', openai: 'OpenAI', cloudflare: 'Cloudflare' }[row.provider] || row.provider)}
                 </td>
                 <td>
                   <span class="table-primary">${row.source === 'api' ? 'API' : 'Playground'}</span

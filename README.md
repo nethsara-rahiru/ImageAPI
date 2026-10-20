@@ -2,7 +2,7 @@
 
 A complete image-generation platform built with **Node.js 24, Express, SQLite, and vanilla HTML/CSS/JavaScript**. There is no Python runtime or frontend build step.
 
-Users create an account, connect their own OpenAI/Gemini/fal.ai credentials, get personal ImageAPI keys, generate in a playground or over the API, and track real usage.
+Users create an account, connect their own OpenAI/Gemini/fal.ai/Cloudflare credentials, get personal ImageAPI keys, generate in a playground or over the API, and track real usage.
 
 ## Run
 
@@ -28,7 +28,7 @@ For the existing Ubuntu VPS, upgrades, SSH tunnel, systemd, and HTTPS setup, see
 - Async salted scrypt password hashing, HttpOnly cookies, CSRF/origin checks, bounded JSON/uploads, persistent rate limits, and security headers.
 - One default ImageAPI key at signup; named keys, masked identifiers, last-used times, revocation, and 10 active keys per account. Full secrets are shown only once and stored as SHA-256 hashes.
 - Per-account AI provider credentials encrypted with AES-256-GCM, never returned in full. Fixed upstream hosts and allowlisted models avoid arbitrary credential forwarding.
-- OpenAI, Google Gemini, and FLUX through fal.ai. “Flex” is interpreted as FLUX; custom provider URLs are not enabled.
+- OpenAI, Google Gemini, FLUX through fal.ai, and Cloudflare Workers AI. “Flex” is interpreted as FLUX; custom provider URLs are not enabled.
 - A prompt/model/size/quality playground with generation states, errors, inspiration prompts, and PNG download. It requires a saved provider key.
 - A real dashboard with monthly totals, success rate, average duration, daily activity, provider counts, pagination, and request-status filters.
 - Atomic quota reservations and concurrency limits shared by API and playground.
@@ -117,15 +117,15 @@ await writeFile('image.png', Buffer.from(result.data[0].b64_json, 'base64'));
 
 | Field | Accepted values |
 | --- | --- |
-| `prompt` | Required; 1–12,000 nonblank characters after trimming |
-| `provider` | `openai` (default), `gemini`, `fal` |
+| `prompt` | Required; 1–12,000 nonblank characters after trimming (Cloudflare: up to 2,048) |
+| `provider` | `openai` (default), `gemini`, `fal`, `cloudflare` |
 | `model` | Supported model from `/api/catalog`; provider default when omitted |
-| `size` | `1024x1024` (default), `1536x1024`, `1024x1536` |
+| `size` | `1024x1024` (default), `1536x1024`, `1024x1536`; Cloudflare: native square only |
 | `quality` | `auto` (default); OpenAI also supports `low`, `medium`, `high` |
 
 Unknown generation fields are rejected. One verified, metadata-stripped PNG is returned per request. JSON includes `id`, `created`, `provider`, `model`, and `data[0]` with `b64_json`, `mime_type`, `width`, and `height`. There are no permanent image URLs. Gemini maps size to aspect ratio (1:1, 3:2, 2:3); actual pixels depend on the model. Provider account access, region, moderation, quota, pricing, and model availability apply.
 
-`/v1/images/generate` remains an authenticated alias with the same JSON contract. No platform-owned OpenAI/Gemini/fal key is used. The caller must first save a credential for that provider under their own account.
+`/v1/images/generate` remains an authenticated alias with the same JSON contract. No platform-owned OpenAI/Gemini/fal/Cloudflare key is used. The caller must first save a credential for that provider under their own account.
 
 Generation errors are sanitized and include `X-Request-ID` after a reservation exists. Provider calls have a three-minute timeout and bounded response size. Provider hosts/model IDs are fixed in `server/providers/catalog.js` and adapters. The upstream protocols follow [OpenAI](https://platform.openai.com/docs/guides/image-generation), [Gemini GenerateContent](https://ai.google.dev/gemini-api/docs/generate-content/image-generation), and [fal FLUX](https://fal.ai/models/fal-ai/flux/schnell/api).
 
@@ -234,3 +234,27 @@ See [OpenAI’s 429 troubleshooting guide](https://help.openai.com/en/articles/5
 Update the checkout and restart the running Node process before retrying. Errors now identify OpenAI, Google Gemini, or fal.ai and the upstream HTTP status. HTTP 401 means authentication was rejected; replace that provider’s saved credential in Settings, using its own API key rather than an ImageAPI bearer key. HTTP 403 means access was denied and can involve model permissions, account eligibility, server location, or key restrictions; it does not alone prove the key is invalid. Recognized OpenAI codes and Google structured restriction reasons receive specific guidance. Raw provider messages and key metadata are never returned to clients.
 
 A Gemini key restricted to browser HTTP referrers cannot authorize this backend’s requests; configure restrictions appropriate for your server. fal.ai requires a fal.ai key for FLUX models. Saving a credential stores it securely but does not verify provider access. Share only the resulting error text and selected provider/model when diagnosing failures, never the credential.
+
+
+## Cloudflare Workers AI (FLUX Schnell)
+
+1. In the Cloudflare dashboard, open **Workers AI → Use REST API**.
+2. Create a Workers AI token with **Workers AI Read and Edit** permissions for your account and copy the **Account ID** (32 hexadecimal characters).
+3. In ImageAPI **Settings → Cloudflare Workers AI**, enter the Account ID and token and save. Both are encrypted together; the full token and account ID are never returned by the settings API. Re-enter both when replacing credentials.
+4. Select Cloudflare in the playground, or call the existing generation endpoint with your ImageAPI bearer key:
+
+```json
+{
+  "provider": "cloudflare",
+  "model": "@cf/black-forest-labs/flux-1-schnell",
+  "prompt": "A little glass greenhouse above a pastel sea",
+  "size": "1024x1024",
+  "quality": "auto"
+}
+```
+
+The model defaults automatically when omitted. This model accepts at most 2,048 prompt characters and uses four inference steps. The documented model API has no width/height controls: ImageAPI offers native square output only and reports actual pixel dimensions; it does not send unsupported size parameters or upscale provider output. Other requested canvas sizes are rejected before a provider call. Output is verified and normalized to PNG like other providers. Failed calls do not consume ImageAPI’s monthly allowance.
+
+Cloudflare offers 10,000 free Neurons per day, shared across Workers AI models; the number of images varies with compute usage. Provider limits and ImageAPI’s monthly allowance are separate. There is no platform-owned token or automatic fallback. No database migration or additional package is required for this integration.
+
+References: [Cloudflare REST setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/), [FLUX Schnell schema](https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/), [current free allocation](https://developers.cloudflare.com/workers-ai/platform/pricing/).

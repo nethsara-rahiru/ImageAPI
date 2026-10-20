@@ -1135,3 +1135,8 @@
     padding: 14px 17px;
   }
 }
+
+.provider-icon.cloudflare {
+  color: #945214;
+  background: #fff1de;
+}

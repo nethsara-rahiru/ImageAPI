@@ -8,7 +8,7 @@ export async function render() {
   const faqs = [
     [
       'Do I still need a provider API key?',
-      'Yes. Bring your own OpenAI, Google Gemini, or fal.ai key. Generation runs on that provider account, which bills you directly for its usage. ImageAPI does not include provider credits.',
+      'Yes. Bring your own OpenAI, Google Gemini, fal.ai, or Cloudflare Workers AI key. Generation runs on that provider account, which bills you directly for its usage. ImageAPI does not include provider credits.',
     ],
     [
       'What counts toward my monthly allowance?',

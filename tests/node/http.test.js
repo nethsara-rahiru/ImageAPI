@@ -44,7 +44,7 @@ test('health identifies Node and only Free is an active plan', async (t) => {
   );
   assert.deepEqual(
     (await env.request.get('/api/catalog')).body.providers.map((p) => p.id),
-    ['openai', 'gemini', 'fal'],
+    ['openai', 'gemini', 'cloudflare', 'fal'],
   );
 });
 test('OpenAPI documents bearer authentication and generation options', async (t) => {

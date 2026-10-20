@@ -25,6 +25,7 @@ export async function render() {
                   >${provider.connected ? 'KEY SAVED' : 'NOT CONNECTED'}</span
                 >
               </div>
+              ${provider.requires_account_id ? /* HTML */ `<div class="field"><label for="account-${provider.id}">Cloudflare Account ID</label><input id="account-${provider.id}" name="account_id" type="text" autocomplete="off" spellcheck="false" minlength="32" maxlength="32" pattern="[a-fA-F0-9]{32}" placeholder="32-character Account ID" required /><small>Cloudflare dashboard → Workers AI → Use REST API. Create a token with Workers AI Read and Edit permissions for this account. Enter the account ID again when replacing the token.</small></div>` : ''}
               <div class="field">
                 <label for="key-${provider.id}"
                   >${provider.connected ? 'Replace' : 'Add'} provider API key</label
@@ -74,9 +75,14 @@ export async function render() {
           submitting(form, async () => {
             await api(`/api/providers/${form.dataset.provider}`, {
               method: 'PUT',
-              body: { api_key: form.querySelector('input').value.trim() },
+              body: {
+                api_key: form.elements.api_key.value.trim(),
+                ...(form.elements.account_id
+                  ? { account_id: form.elements.account_id.value.trim() }
+                  : {}),
+              },
             });
-            form.querySelector('input').value = '';
+            form.reset();
             toast('Provider key saved securely');
             navigate('/settings', { replace: true });
           });

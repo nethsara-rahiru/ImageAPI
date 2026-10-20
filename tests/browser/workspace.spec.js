@@ -134,3 +134,43 @@ test('public and account screens meet automated WCAG checks', async ({ page }) =
     expect(results.violations).toEqual([]);
   }
 });
+
+test('Cloudflare settings, playground, usage, bearer API, and disconnect', async ({
+  page,
+  request,
+}) => {
+  const account = await register(page);
+  await page.goto('/settings');
+  const form = page.locator('[data-provider="cloudflare"]');
+  await form.getByLabel('Cloudflare Account ID').fill('a'.repeat(32));
+  await form.getByLabel('Add provider API key').fill('cloudflare-browser-fixture-only');
+  await form.getByRole('button', { name: 'Save key' }).click();
+  await expect(form.getByText('KEY SAVED', { exact: true })).toBeVisible();
+  await page.goto('/playground');
+  await expect(page.getByLabel('Provider', { exact: true })).toHaveValue('cloudflare');
+  await expect(page.getByLabel('Model', { exact: true })).toHaveValue(
+    '@cf/black-forest-labs/flux-1-schnell',
+  );
+  await expect(page.getByLabel('Your prompt')).toHaveAttribute('maxlength', '2048');
+  await expect(page.getByLabel('Canvas size').locator('option')).toHaveCount(1);
+  await expect(page.getByText(/Native square output/)).toBeVisible();
+  await page.getByLabel('Your prompt').fill('A blue glass greenhouse');
+  await page.getByRole('button', { name: 'Generate image', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'A blue glass greenhouse' })).toBeVisible();
+  const result = await request.post('/v1/images/generations', {
+    headers: { Authorization: `Bearer ${account.apiKey}` },
+    data: { provider: 'cloudflare', prompt: 'A blue glass greenhouse' },
+  });
+  expect(result.status()).toBe(200);
+  expect((await result.json()).provider).toBe('cloudflare');
+  await page.goto('/dashboard');
+  await expect(page.locator('tbody tr')).toHaveCount(2);
+  await expect(page.locator('tbody tr').first()).toContainText('Cloudflare');
+  await page.goto('/settings');
+  await form.getByRole('button', { name: 'Disconnect' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await expect(form.getByText('NOT CONNECTED', { exact: true })).toBeVisible();
+  await page.goto('/playground');
+  await page.getByLabel('Provider', { exact: true }).selectOption('cloudflare');
+  await expect(page.getByRole('button', { name: 'Generate image', exact: true })).toBeDisabled();
+});
