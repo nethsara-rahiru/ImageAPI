@@ -1,15 +1,33 @@
 {
-  "name": "imageapi-dev-tools",
+  "name": "imageapi",
+  "version": "1.0.0",
   "private": true,
-  "description": "Optional formatting and browser tests; the frontend needs no build step.",
+  "type": "module",
+  "description": "A Node.js image generation platform with a vanilla JavaScript workspace.",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
-    "format": "prettier --write frontend tests/browser playwright.config.js",
-    "format:check": "prettier --check frontend tests/browser playwright.config.js",
-    "test:browser": "playwright test"
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "dev": "node --env-file-if-exists=.env --watch server/index.js",
+    "test": "node --test tests/node/*.test.js",
+    "test:browser": "playwright test",
+    "check": "node scripts/check.js",
+    "format": "prettier --write server frontend tests scripts playwright.config.js",
+    "format:check": "prettier --check server frontend tests scripts playwright.config.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "express": "^5.1.0",
+    "multer": "^2.0.2",
+    "sharp": "^0.35.5",
+    "undici": "^7.16.0",
+    "zod": "^4.1.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.0",
     "@axe-core/playwright": "^4.11.0",
-    "prettier": "^3.8.0"
+    "@playwright/test": "^1.58.0",
+    "prettier": "^3.8.0",
+    "supertest": "^7.2.0"
   }
 }

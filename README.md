@@ -1,47 +1,83 @@
-# ImageAPI
+# ImageAPI · Node.js
 
-A complete local image-generation workspace: a vanilla HTML/CSS/JavaScript frontend and a FastAPI backend. Users create an account, connect their own AI provider credentials, receive ImageAPI keys, and generate through the browser or a consistent JSON API.
+A complete image-generation platform built with **Node.js 24, Express, SQLite, and vanilla HTML/CSS/JavaScript**. There is no Python runtime or frontend build step.
 
-## Start locally
+Users create an account, connect their own OpenAI/Gemini/fal.ai credentials, get personal ImageAPI keys, generate in a playground or over the API, and track real usage.
 
-Requires Python 3.11+; Python 3.12 is used in CI. Node.js is optional and needed only for frontend formatting and browser tests. No frontend compilation or React is involved.
+## Run
+
+Install Node.js 24 LTS or later, then:
 
 ```bash
-git clone https://github.com/nethsara-rahiru/ImageAPI.git
+git clone --branch feat/image-api-starter https://github.com/nethsara-rahiru/ImageAPI.git
 cd ImageAPI
-git checkout feat/image-api-starter
-python -m venv .venv
-source .venv/bin/activate
-pip install -e '.[dev]'
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-proxy-headers
+npm ci
+npm start
 ```
 
-Open **http://127.0.0.1:8000**. Use this exact origin with the default configuration. To use another hostname or port, set `IMAGEAPI_PUBLIC_ORIGIN` to that origin before starting.
+Open **http://127.0.0.1:8080**. Node starts the backend and serves the frontend together. SQLite is built into Node; Sharp performs image processing. npm installs the platform-specific Sharp binaries automatically on supported systems.
 
-1. Create an account at `/signup`. Passwords require at least 12 characters.
-2. Save the **ImageAPI key and recovery code** shown once after signup. They can be downloaded as a text file; keep that file private.
-3. In `/settings`, add your own OpenAI, Google Gemini, or fal.ai API key.
-4. Generate in `/playground` or `/api`, or call the API from your server.
-5. See your real request counts, daily activity, status, and timing at `/dashboard`.
+Create an account, save the **ImageAPI key and recovery code** shown once, add your AI provider key in **Settings**, then generate in **Playground** or the **API** page. Provider keys are checked during generation, not at save time. No global provider key or fake-success mode is used.
 
-Provider credentials are verified when a generation is attempted, not when they are saved. No platform-owned provider key is used. Provider billing and model access remain with the user’s provider account.
+For the existing Ubuntu VPS, upgrades, SSH tunnel, systemd, and HTTPS setup, see **[deploy/README.md](deploy/README.md)**. The new default port is **8080**.
 
-## What’s included
+## Features
 
-- Responsive landing, pricing, signup, login, recovery, dashboard, settings, API key, playground, and documentation pages.
-- Light blue/white design, matching pastel artwork, transitions, animations, mobile navigation, and reduced-motion support. All assets are local.
-- Email/password authentication using scrypt password hashes and seven-day HttpOnly session cookies.
-- CSRF protection, same-origin browser writes, bounded bodies, persistent rate limits, and account isolation.
-- A default ImageAPI key at signup; create named keys, view masked identifiers and last-use dates, and revoke keys. Full secrets appear only once. Up to 10 active keys per account.
-- Per-account, Fernet-encrypted provider credentials. No full saved provider key is returned to the browser. Provider hosts and model IDs are allowlisted.
-- OpenAI, Gemini, and FLUX through fal.ai. “Flex” was interpreted as FLUX; there is no separate Flex provider or arbitrary custom-provider URL feature in this release.
-- A browser playground with provider/model/size/quality controls, prompt ideas, generation states, error feedback, and PNG download.
-- A bearer-authenticated API using the same provider credentials, quota, and request ledger as the playground.
-- A real usage dashboard with monthly counts, success rate, average duration, a daily chart, filters, and paginated history. No sample usage or estimated billing is presented as real.
-- Account recovery with a one-time code, password changes, and account deletion with cascading data removal.
-- SQLite persistence, backend integration tests, browser flows, accessibility checks, and CI.
+- Email/password registration, login/logout, recovery codes, password changes, and account deletion.
+- Persistent SQLite accounts, sessions, API keys, provider credentials, and usage metadata.
+- Async salted scrypt password hashing, HttpOnly cookies, CSRF/origin checks, bounded JSON/uploads, persistent rate limits, and security headers.
+- One default ImageAPI key at signup; named keys, masked identifiers, last-used times, revocation, and 10 active keys per account. Full secrets are shown only once and stored as SHA-256 hashes.
+- Per-account AI provider credentials encrypted with AES-256-GCM, never returned in full. Fixed upstream hosts and allowlisted models avoid arbitrary credential forwarding.
+- OpenAI, Google Gemini, and FLUX through fal.ai. “Flex” is interpreted as FLUX; custom provider URLs are not enabled.
+- A prompt/model/size/quality playground with generation states, errors, inspiration prompts, and PNG download. It requires a saved provider key.
+- A real dashboard with monthly totals, success rate, average duration, daily activity, provider counts, pagination, and request-status filters.
+- Atomic quota reservations and concurrency limits shared by API and playground.
+- Light blue/white responsive landing, pricing, account, dashboard, API, settings, and documentation pages. Local SVG artwork, animations, transitions, and reduced-motion support; no React.
+- Authenticated image resizing/conversion, consistent generation responses, OpenAPI, and server-side JavaScript examples.
+- Node backend/protocol/migration tests and Playwright browser/accessibility suites. CI uses Node only.
 
-## Pricing and starter limits
+## Existing Python installations
+
+**Stop the Python server before starting Node against the same database.** Retain your original `IMAGEAPI_DATA_DIR` and encryption key. Do not delete the data folder or replace the encryption secret.
+
+The Node server reads the existing SQLite schema directly. Before its first legacy migration it makes a consistent database backup (and a copy of the local encryption-key file, if present) in `data/backups/`. It preserves accounts, API keys, browser sessions, provider connections, and usage. Legacy scrypt passwords are verified and upgraded on login; Fernet provider credentials are authenticated/decrypted and upgraded to AES-GCM when used. None of this requires Python.
+
+If you use `IMAGEAPI_ENCRYPTION_KEY` from the environment, keep exactly that same value and back it up separately. The encryption key remains a base64url-encoded 32-byte key. Automatic backups do not include externally configured secrets.
+
+The new credential formats are not readable by the old Python backend. A rollback requires restoring the complete pre-migration database and encryption key together. Keep a separate backup before updating, even though the first Node migration also creates one. Tests include fixtures produced by the original Python implementation and exercise a complete legacy database migration.
+
+## Configuration
+
+`npm start` automatically loads `.env` if present. Copy `.env.example` to `.env` to customize; explicit shell environment variables take precedence.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `HOST` | `127.0.0.1` | Listen interface; keep loopback behind a reverse proxy or SSH tunnel |
+| `PORT` | `8080` | HTTP port |
+| `IMAGEAPI_PUBLIC_ORIGIN` | `http://127.0.0.1:<PORT>` | Exact browser origin, without a trailing slash |
+| `IMAGEAPI_DATA_DIR` | `./data` | SQLite database and local encryption key |
+| `IMAGEAPI_SECURE_COOKIES` | `false` | Set `true` when the public origin uses HTTPS |
+| `IMAGEAPI_ENCRYPTION_KEY` | Generated locally | Base64url-encoded 32-byte encryption key |
+
+To run on a different local port:
+
+```bash
+PORT=9090 IMAGEAPI_PUBLIC_ORIGIN=http://127.0.0.1:9090 npm start
+```
+
+Windows PowerShell:
+
+```powershell
+$env:PORT='9090'
+$env:IMAGEAPI_PUBLIC_ORIGIN='http://127.0.0.1:9090'
+npm start
+```
+
+Use the exact configured origin in your browser, or writes will be rejected. No CORS access is enabled for browser clients on other origins. Server-side bearer clients do not need an Origin header. Forwarded IP headers are not trusted; behind a proxy, authentication IP throttling applies to the proxy socket address. Configure an appropriate outer gateway rate policy before a large public launch.
+
+Provider calls use Undici's environment-aware HTTP proxy support, preserving `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, and Node's configured CA trust. Redirects are not followed with provider credentials.
+
+## Pricing and limits
 
 | Plan | Proposed price | Images / month | Status |
 | --- | --- | --- | --- |
@@ -50,18 +86,20 @@ Provider credentials are verified when a generation is attempted, not when they 
 | Pro | $29/month | 10,000 | Preview only |
 | Enterprise | Custom | Custom | Preview only |
 
-**There are no payments, subscriptions, or paid plan upgrades.** Every account uses Free. Paid prices and features are explicitly labeled previews and do not activate anything. Provider charges are separate from the ImageAPI allowance.
+**Payments and subscriptions are not enabled. All accounts use Free.** Paid prices/features are clearly labeled previews and do not activate upgrades. Provider charges are separate and paid directly through users' own provider accounts. The dashboard reports counts/timing, not guessed provider spending.
 
-Free allows 20 generation attempts per minute and two simultaneous generations per account. Playground and API use the same allowance. Calendar-month quotas reset at 00:00 UTC on the first day. Reservations are atomic, so concurrent requests cannot overspend the allowance. Successful, pending, and unknown-outcome requests count; failed requests do not. Requests abandoned by a terminated worker become `unknown` after five minutes when usage is viewed or another generation is attempted. They count conservatively because a provider may have completed them.
+Free allows 100 images per calendar month (reset at 00:00 UTC on the first day), 20 generation attempts/minute, two simultaneous generations, and 10 active API keys. API/playground share the allowance. Successful, pending, and unknown-outcome requests count. Failed requests do not, although providers may still bill some failures or timeouts. Reservations are atomic across concurrent requests.
+
+Interrupted reservations become `unknown` after five minutes when usage is viewed or another request is attempted, because the provider may have completed the work. There is no automatic retry or idempotency guarantee. Inspect provider usage before retrying a timeout to avoid duplicate charges.
 
 ## Generate over the API
 
 ```bash
-curl --fail-with-body http://127.0.0.1:8000/v1/images/generations \
+curl --fail-with-body http://127.0.0.1:8080/v1/images/generations \
   -H 'Authorization: Bearer YOUR_IMAGEAPI_KEY' \
   -H 'Content-Type: application/json' \
   -d '{
-    "prompt": "A glass greenhouse floating over a pastel sea at sunrise",
+    "prompt": "A glass greenhouse above a pastel sea at sunrise",
     "provider": "openai",
     "model": "gpt-image-1",
     "size": "1024x1024",
@@ -69,117 +107,108 @@ curl --fail-with-body http://127.0.0.1:8000/v1/images/generations \
   }' > response.json
 ```
 
-```python
-import base64
-import json
-from pathlib import Path
+Decode the returned image with Node:
 
-result = json.loads(Path("response.json").read_text())
-Path("image.png").write_bytes(base64.b64decode(result["data"][0]["b64_json"]))
+```js
+import { readFile, writeFile } from 'node:fs/promises';
+const result = JSON.parse(await readFile('response.json', 'utf8'));
+await writeFile('image.png', Buffer.from(result.data[0].b64_json, 'base64'));
 ```
 
-The response contains `id`, `created`, `provider`, `model`, and `data[0]` with `b64_json`, `mime_type`, `width`, and `height`. One PNG is returned per request; images are not hosted or retained. The legacy `/v1/images/generate` path is an authenticated alias with the **new JSON response contract**; it no longer returns raw PNG bytes or uses a server-wide OpenAI key.
-
-| Option | Values |
+| Field | Accepted values |
 | --- | --- |
-| `prompt` | Required; 1–12,000 nonblank characters |
+| `prompt` | Required; 1–12,000 nonblank characters after trimming |
 | `provider` | `openai` (default), `gemini`, `fal` |
-| `model` | Defaults to the selected provider’s default; must be in `/api/catalog` |
+| `model` | Supported model from `/api/catalog`; provider default when omitted |
 | `size` | `1024x1024` (default), `1536x1024`, `1024x1536` |
-| `quality` | `auto` (default); OpenAI also accepts `low`, `medium`, `high` |
+| `quality` | `auto` (default); OpenAI also supports `low`, `medium`, `high` |
 
-Gemini maps size to aspect ratio (1:1, 3:2, 2:3); actual pixels depend on the model. Provider access, pricing, moderation, and model availability apply. Keys saved for one provider cannot authorize requests to another.
+Unknown generation fields are rejected. One verified, metadata-stripped PNG is returned per request. JSON includes `id`, `created`, `provider`, `model`, and `data[0]` with `b64_json`, `mime_type`, `width`, and `height`. There are no permanent image URLs. Gemini maps size to aspect ratio (1:1, 3:2, 2:3); actual pixels depend on the model. Provider account access, region, moderation, quota, pricing, and model availability apply.
 
-The provider adapters follow the official [OpenAI image API](https://platform.openai.com/docs/guides/image-generation), [Gemini GenerateContent image API](https://ai.google.dev/gemini-api/docs/generate-content/image-generation), and [fal FLUX synchronous API](https://fal.ai/models/fal-ai/flux/schnell/api). Supported IDs live in `app/providers/catalog.py` and can be updated as providers change availability. No live paid generation calls were made during development; protocol tests use mocked provider responses.
+`/v1/images/generate` remains an authenticated alias with the same JSON contract. No platform-owned OpenAI/Gemini/fal key is used. The caller must first save a credential for that provider under their own account.
 
-Generation has a bounded provider wait and no automatic retries or idempotency guarantee. A timeout does **not** prove the provider did no work. Check the provider’s usage before retrying to avoid duplicate charges. Provider errors are sanitized; failed generation responses include `X-Request-ID` after a reservation exists. `/docs` covers errors and server-side JavaScript/Python examples. `/openapi.json` provides the machine-readable API schema.
+Generation errors are sanitized and include `X-Request-ID` after a reservation exists. Provider calls have a three-minute timeout and bounded response size. Provider hosts/model IDs are fixed in `server/providers/catalog.js` and adapters. The upstream protocols follow [OpenAI](https://platform.openai.com/docs/guides/image-generation), [Gemini GenerateContent](https://ai.google.dev/gemini-api/docs/generate-content/image-generation), and [fal FLUX](https://fal.ai/models/fal-ai/flux/schnell/api).
+
+The `/docs` page covers request options and errors; `/openapi.json` documents the machine-readable image API.
 
 ## Routes
 
-| Route | Purpose |
+| Endpoint | Purpose |
 | --- | --- |
-| `/`, `/pricing`, `/docs` | Public frontend |
+| `/`, `/pricing`, `/docs` | Public pages |
 | `/signup`, `/login`, `/recover` | Account entry and recovery |
-| `/dashboard`, `/api`, `/playground`, `/settings` | Authenticated frontend |
+| `/dashboard`, `/api`, `/playground`, `/settings` | Authenticated workspace |
 | `POST /api/auth/register`, `/login`, `/recover` | Authentication and recovery |
-| `GET /api/auth/me` | Session user and CSRF token |
-| `POST /api/auth/logout`, `/password` | End session or change password |
-| `DELETE /api/auth/account` | Delete own account after password confirmation |
-| `GET/POST /api/keys`, `DELETE /api/keys/{id}` | ImageAPI key lifecycle |
-| `GET /api/providers`, `PUT/DELETE /api/providers/{id}` | Own provider credentials |
-| `GET /api/usage` | Own usage, daily chart, request history |
-| `GET /api/catalog`, `/api/plans` | Public model catalog and pricing |
-| `POST /v1/images/generations` | Generate using an ImageAPI bearer key or CSRF-protected browser session |
-| `POST /v1/images/transform` | Authenticated resize/conversion of uploaded images |
-| `GET /health` | Process liveness; does not test provider readiness |
+| `GET /api/auth/me` | Current user and CSRF token |
+| `POST /api/auth/logout`, `/password` | Logout or change password |
+| `DELETE /api/auth/account` | Delete own account with password confirmation |
+| `GET/POST /api/keys`, `DELETE /api/keys/:id` | ImageAPI keys |
+| `GET /api/providers`, `PUT/DELETE /api/providers/:id` | Own saved provider keys |
+| `GET /api/usage` | Real usage; `page` and `status` filters |
+| `GET /api/catalog`, `/api/plans` | Model and pricing catalogs |
+| `POST /v1/images/generations` | Image generation |
+| `POST /v1/images/transform` | Resize/convert upload |
+| `GET /health` | Liveness, version, and `runtime: "node"`; not provider readiness |
 
-Bearer keys authorize image endpoints only. They cannot manage accounts, read provider settings, or view usage; those operations require a browser session. All modifying browser-session requests require `X-CSRF-Token`, obtained from register, login, or `/api/auth/me`. Cross-origin browser access is not enabled: call ImageAPI from your server, never embed secrets in client bundles.
+ImageAPI bearer keys authorize image endpoints only, not account management or usage/settings reads. Browser sessions authorize account operations and generation. All cookie-authenticated writes require `X-CSRF-Token`, returned by registration, login, and `/api/auth/me`. Store ImageAPI keys in your application's backend; never ship them in public frontend bundles.
 
-The retained transformation endpoint accepts JPEG, PNG, and WebP up to 10 MiB and 20 million pixels. Optional width/height bounds (1–4096) preserve aspect ratio without upscaling. Output formats are `jpeg`, `png`, and `webp`; quality is 1–100. JPEG uses a white transparency background. Only the first animation frame is used; metadata is removed. Transformations are separate from AI image generation and are not counted as generated images.
+Transform accepts JPEG/PNG/WebP up to 10 MiB and 20 million decoded pixels. `width`/`height` bound the result (1–4096); aspect ratio is preserved without upscaling. Output `format` is `jpeg`, `png`, or `webp`; `quality` is 1–100. JPEG transparency is flattened on white, EXIF orientation is applied, metadata is removed, and animations use the first frame. Transform has a separate 30 requests/minute account limit and does not count toward generated-image quota.
 
-## Configuration and persistence
+## Security and operations
 
-| Environment variable | Default | Purpose |
-| --- | --- | --- |
-| `IMAGEAPI_DATA_DIR` | `./data` | SQLite database and local encryption-key directory |
-| `IMAGEAPI_PUBLIC_ORIGIN` | `http://127.0.0.1:8000` | Exact browser origin allowed to write |
-| `IMAGEAPI_SECURE_COOKIES` | `false` | Set `true` behind HTTPS |
-| `IMAGEAPI_ENCRYPTION_KEY` | Generated locally if absent | Fernet key for provider secrets |
+Passwords use async scrypt (N=32768, r=8, p=3) with random salts. Session and API tokens use 256 random bits and are stored as SHA-256 hashes. Provider credentials use authenticated AES-256-GCM. The browser stores no credentials in localStorage/sessionStorage. JSON validation errors omit submitted inputs, so passwords/keys are not echoed. Body limits apply before JSON parsing; multipart uploads have file/part limits and decoded image limits.
 
-`.env.example` contains placeholders. To use a `.env` file, explicitly run `uvicorn app.main:app --env-file .env ...`; otherwise export environment variables in your shell. User provider keys belong in account Settings, not `.env`.
+SQLite uses WAL, foreign keys, indexed request metadata, short synchronous transactions, and owner-private data files. It targets a single application instance with durable local storage. Do not use stateless multi-replica hosting without replacing/coordinating persistence and limits. Password hashing and Sharp image work run outside the JavaScript event loop; provider HTTP is asynchronous.
 
-SQLite uses WAL, foreign keys, indexed account history, and short atomic write transactions. The database file is owner-readable/writable. In local mode a private `data/encryption.key` is generated once and reused across restarts. Data directories, `.env`, test output, and credentials are ignored by Git.
+Prompts and image bytes are processed in memory, never persisted to application storage. Metadata includes provider/model/size/source/status/timing. Providers process prompts under their own policies. Full provider keys and bearer secrets are never logged or returned after creation.
 
-**Back up the database and the encryption key securely.** Losing the encryption key means saved provider credentials must be re-entered. Changing the key is not an automatic rotation or migration. For deployment, inject a stable encryption key through a secret manager, keep it separate from database backups, use HTTPS and secure cookies, set the correct origin, and mount durable storage. Keep a stopped-server copy or use SQLite’s backup API; don’t copy a live database without accounting for WAL. This SQLite design targets a single application instance, not stateless multi-replica hosting.
+There is no SMTP or email verification. Recovery uses the one-time code shown at signup; it rotates the code and revokes all sessions and ImageAPI keys. A password change revokes sessions but preserves ImageAPI keys. Account deletion removes active database records; backups remain subject to operator retention.
 
-There is no SMTP integration or email verification in this local release. Password recovery requires the code displayed at signup; recovery rotates the code and revokes every session and ImageAPI key. Password changes revoke sessions while leaving API keys intact. Account deletion removes rows from the active database; backup retention is the operator’s responsibility.
+Back up SQLite and the encryption key securely. Losing/changing the key does not automatically rotate credentials: users must reconnect them. For public deployment use HTTPS, secure cookies, the exact origin, durable storage, a stable secret-manager encryption key, and appropriate external connection/rate limits. Protect backups separately. Do not copy a live SQLite database without accounting for WAL; use the SQLite backup API or a stopped-server copy.
 
-Prompts and image bytes are processed in memory and are not written to application storage. Usage logs contain only request metadata. AI providers process prompts under their own policies. No provider balance, token cost, or spending figure is fabricated in the dashboard.
+SIGINT/SIGTERM stop accepting new connections and drain current requests before closing the database. A busy port gives a clear error rather than starting another instance. The supplied systemd and Caddy examples are optional, reviewed templates; starting the app does not modify a VPS firewall or replace existing web server configuration.
 
 ## Code organization
 
 ```text
-app/
-  main.py              App factory and static frontend routes
-  config.py            Runtime settings
-  database.py          SQLite schema and transaction boundary
-  security.py          Passwords, token hashes, encryption
-  auth.py              Sessions, CSRF, bearer keys, rate limiting
-  middleware.py        Origin checks, body limits, security headers
-  errors.py            Validation error redaction
-  generation.py        Generation validation and orchestration
-  usage.py             Atomic reservations and outcomes
-  providers/           Catalog and one adapter per provider
-  routes/              Accounts, keys, dashboard, transforms
+server/
+  index.js              Start/listen and graceful shutdown
+  app.js                App factory and HTTP/static routing
+  config/               Environment validation, plans, OpenAPI
+  db/                   Schema, legacy backup/migration, transactions
+  auth/                 Session/bearer middleware and token issuance
+  security/             Scrypt, token hashes, AES-GCM, Fernet read compatibility
+  middleware/           Origin checks and response security headers
+  providers/            One adapter per provider; bounded proxy-aware transport
+  services/             Validation, usage reservations, dashboard, image processing
+  routes/               Accounts, API keys, dashboard, generation, transforms
 frontend/
-  index.html           Buildless application shell
-  assets/              Original SVG illustrations and favicon
-  css/                 Tokens, base, components, marketing, workspace, auth
-  js/core/             API client, router, state, forms, escaping
-  js/components/       Layouts, icons, dialogs, chart, history, toasts
-  js/pages/            One module per page; shared playground behavior
+  index.html            Buildless application shell
+  assets/               Local original SVG artwork
+  css/                  Tokens, base, components, marketing, workspace, account styles
+  js/core/              API client, state, router, forms, escaping
+  js/components/        Layouts, dialogs, icons, chart, history, code blocks, toasts
+  js/pages/             One module per page, shared playground
+scripts/                JavaScript syntax checks
+deploy/                 VPS guide, systemd unit, HTTPS proxy example
 tests/
-  test_*.py            Backend and protocol integration tests
-  browser/             Playwright flows and isolated mocked-provider server
+  node/                 Native node:test API, security, provider, and migration tests
+  browser/              Playwright flows and isolated Node test server
+  fixtures/             Non-secret legacy compatibility test data
 ```
 
-## Verification
-
-```bash
-source .venv/bin/activate
-pytest -q
-```
-
-Optional browser and accessibility checks (Node.js 20+):
+## Test
 
 ```bash
 npm ci
+npm run check
+npm test
 npx playwright install chromium
 npm run test:browser
 ```
 
-If Chromium is already installed, set `IMAGEAPI_CHROMIUM_PATH=/usr/bin/chromium`. If Python is not at `.venv/bin/python`, set `IMAGEAPI_TEST_PYTHON` to its executable. Browser tests launch an isolated test-only server on port 8765, use a temporary database, and substitute deterministic images **only in that test server**. Normal `app.main:app` has no mock provider or fake-success mode. Tests make no paid generation calls.
+With an installed Chromium, set `IMAGEAPI_CHROMIUM_PATH=/usr/bin/chromium`. No Python is needed for testing. Browser tests start an isolated Node server on 8765, create a temporary database, and substitute deterministic provider responses only in that test module. Production `npm start` has no mock provider switch. Tests make no paid provider calls.
 
-The browser suite covers signup, one-time credentials, provider settings, generation/download, real usage updates, bearer requests, key creation/revocation, logout/login, recovery, responsive layouts, and automated WCAG checks. Backend tests cover isolation, encryption, auth/CSRF, concurrency, quota enforcement, provider protocols/errors, persistence, and image transformations. Formatting is available with `npm run format`; the frontend still runs directly without Node.js.
+Backend coverage includes account isolation, password/session/recovery behavior, encryption/tamper checks, key lifecycle, quotas, concurrent reservations, UTC resets, upload limits, provider protocols/error redaction, API/static routes, and real legacy migration fixtures. Browser coverage includes signup, credential handoff, settings, playground/download, bearer requests, actual usage changes, key revocation, recovery/login, mobile layouts, and automated accessibility checks.
 
-This release is for local evaluation. No public deployment, billing integration, team features, or custom provider endpoints are enabled.
+Use `npm run format` or `npm run format:check` for formatting. CI runs Node syntax, backend, and browser tests. Real provider calls still require valid account-owned keys and were not made during development. Paid plans remain previews with no checkout or subscription activation.

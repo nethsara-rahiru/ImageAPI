@@ -1,6 +1,6 @@
-const { defineConfig } = require('@playwright/test');
+import { defineConfig } from '@playwright/test';
 
-module.exports = defineConfig({
+export default defineConfig({
   testDir: './tests/browser',
   testMatch: '**/*.spec.js',
   fullyParallel: false,
@@ -16,7 +16,7 @@ module.exports = defineConfig({
       : {},
   },
   webServer: {
-    command: `${process.env.IMAGEAPI_TEST_PYTHON || '.venv/bin/python'} -m uvicorn --app-dir tests/browser server:app --host 127.0.0.1 --port 8765 --no-proxy-headers`,
+    command: 'node tests/browser/server.js',
     url: 'http://127.0.0.1:8765/health',
     reuseExistingServer: false,
     timeout: 30000,

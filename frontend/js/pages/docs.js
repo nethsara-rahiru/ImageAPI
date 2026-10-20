@@ -4,7 +4,7 @@ import { icon } from '../components/icons.js';
 export async function render() {
   const js = `const response = await fetch("${location.origin}/v1/images/generations", {\n  method: "POST",\n  headers: {\n    Authorization: \`Bearer \${process.env.IMAGEAPI_KEY}\`,\n    "Content-Type": "application/json"\n  },\n  body: JSON.stringify({\n    prompt: "A glass greenhouse above a pastel sea",\n    provider: "gemini",\n    model: "gemini-2.5-flash-image",\n    size: "1536x1024",\n    quality: "auto"\n  })\n});\nif (!response.ok) throw new Error(await response.text());\nconst result = await response.json();\n// Node.js: save the PNG\nawait fs.writeFile("image.png",\n  Buffer.from(result.data[0].b64_json, "base64"));`;
   const response = `{\n  "id": "req_…",\n  "created": 1792454400,\n  "provider": "openai",\n  "model": "gpt-image-1",\n  "data": [{\n    "b64_json": "iVBORw0KGgo…",\n    "mime_type": "image/png",\n    "width": 1024,\n    "height": 1024\n  }]\n}`;
-  const python = `import base64\nimport os\nimport requests\n\nresponse = requests.post(\n    "${location.origin}/v1/images/generations",\n    headers={"Authorization": f"Bearer {os.environ['IMAGEAPI_KEY']}"},\n    json={\n        "prompt": "A ceramic vase, a single orange branch",\n        "provider": "fal",\n        "model": "fal-ai/flux/schnell",\n        "size": "1024x1024",\n        "quality": "auto",\n    },\n    timeout=210,\n)\nresponse.raise_for_status()\nwith open("image.png", "wb") as image:\n    image.write(base64.b64decode(response.json()["data"][0]["b64_json"]))`;
+
   return {
     html: marketingLayout(
       /* HTML */ `<div class="container docs-layout">
@@ -184,9 +184,9 @@ export async function render() {
           <h2 id="examples">Make it part of your app.</h2>
           <p>
             These examples run on your server. For JavaScript, import <code>fs</code> from
-            <code>node:fs/promises</code>. For Python, install <code>requests</code> first.
+            <code>node:fs/promises</code>. The application itself runs on Node.js 24 or later.
           </p>
-          ${codePanel(js, { label: 'JavaScript · Node.js', id: 'docs-js' })}${codePanel(python, { label: 'Python', id: 'docs-python' })}
+          ${codePanel(js, { label: 'JavaScript · Node.js', id: 'docs-js' })}
           <h2 id="errors">Know what to expect.</h2>
           <p>
             Errors return JSON with a <code>detail</code> message. Generation errors after a
@@ -244,8 +244,8 @@ export async function render() {
           </p>
           <h2 id="privacy">Your keys. Your data.</h2>
           <p>
-            Provider keys are encrypted with Fernet and never returned in full. ImageAPI bearer keys
-            and session tokens are stored as hashes. Passwords use salted scrypt. Only model,
+            Provider keys are encrypted with AES-256-GCM and never returned in full. ImageAPI bearer
+            keys and session tokens are stored as hashes. Passwords use salted scrypt. Only model,
             provider, size, source, status, and timing metadata is kept for usage reporting.
           </p>
           <p>

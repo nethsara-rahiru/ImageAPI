@@ -1,0 +1,25 @@
+# Review the user, checkout path, and node executable before installation.
+[Unit]
+Description=ImageAPI Node.js server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dev
+Group=dev
+WorkingDirectory=/home/dev/imageapi-test
+ExecStart=/usr/bin/node --env-file-if-exists=.env server/index.js
+Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=200
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/dev/imageapi-test/data
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

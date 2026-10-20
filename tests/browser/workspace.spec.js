@@ -1,5 +1,5 @@
-const { test, expect } = require('@playwright/test');
-const AxeBuilder = require('@axe-core/playwright').default;
+import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 async function register(page) {
   const email = `browser-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`;
