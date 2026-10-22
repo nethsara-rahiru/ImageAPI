@@ -12,7 +12,7 @@ export function openDatabase(config) {
     chmodSync(filename, 0o600);
     db.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=15000; PRAGMA journal_mode=WAL;');
     const version = db.prepare('PRAGMA user_version').get().user_version;
-    if (version > 2) throw new Error('Database schema is newer than this ImageAPI release');
+    if (version > 3) throw new Error('Database schema is newer than this ImageAPI release');
     if (version === 1) {
       const folder = path.join(config.dataDir, 'backups');
       mkdirSync(folder, { recursive: true, mode: 0o700 });
@@ -30,7 +30,7 @@ export function openDatabase(config) {
     }
     transaction(db, () => {
       db.exec(schema);
-      db.exec('PRAGMA user_version=2');
+      db.exec('PRAGMA user_version=3');
     });
     chmodSync(filename, 0o600);
     return db;

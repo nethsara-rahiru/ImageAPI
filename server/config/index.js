@@ -36,6 +36,25 @@ export function loadConfig(overrides = {}) {
     maxApiKeys: overrides.maxApiKeys ?? 10,
     concurrency: overrides.concurrency ?? 2,
     sessionDays: 7,
+    posterWorkers: integer(
+      overrides.posterWorkers ?? process.env.IMAGEAPI_POSTER_WORKERS,
+      2,
+      'IMAGEAPI_POSTER_WORKERS',
+      1,
+      4,
+    ),
+    posterQueueLimit: 20,
+    posterStorageLimit:
+      integer(
+        overrides.posterStorageLimit ?? process.env.IMAGEAPI_POSTER_STORAGE_MB,
+        512,
+        'IMAGEAPI_POSTER_STORAGE_MB',
+        32,
+        10240,
+      ) *
+      1024 *
+      1024,
+    jobInterval: overrides.jobInterval ?? 1000,
     jsonLimit: 1024 * 1024,
     uploadLimit: overrides.uploadLimit ?? 10 * 1024 * 1024,
     maxPixels: overrides.maxPixels ?? 20_000_000,
