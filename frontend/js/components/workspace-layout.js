@@ -7,6 +7,8 @@ import { brand, icon } from './icons.js';
 const links = [
   ['/dashboard', 'grid', 'Overview'],
   ['/api', 'key', 'API keys'],
+  ['/posters', 'image', 'Poster studio'],
+  ['/brands', 'layers', 'Brand profiles'],
   ['/playground', 'sparkles', 'Playground'],
   ['/settings', 'settings', 'Settings'],
 ];

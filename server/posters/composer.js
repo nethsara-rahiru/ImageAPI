@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { outline, validateCharacters } from './fonts.js';
+import { measure, validateCharacters } from './fonts.js';
 import { typeset, fitBlock, contrast } from './typography.js';
 import { planPoster } from './planner.js';
 import { HttpError } from '../lib/errors.js';
@@ -32,7 +32,7 @@ export async function composePoster(image, body, brand) {
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${svg.join('')}</svg>`,
   );
   const artBuffer = await sharp(Buffer.from(image.encoded, 'base64'))
-    .resize(art.width, art.height, { fit: 'cover', position: sharp.strategy.attention })
+    .resize(art.width, art.height, { fit: 'cover', position: 'centre' })
     .png()
     .toBuffer();
   const overlays = [{ input: artBuffer, left: art.x, top: art.y }];
@@ -57,7 +57,11 @@ export async function composePoster(image, body, brand) {
         rect(
           block.box.x - 22 * u,
           block.box.y - 10 * u,
-          plan.zone.width,
+          Math.min(
+            plan.zone.width,
+            Math.max(...block.lines.map((line) => measure(line, block.size, block.family))) +
+              44 * u,
+          ),
           block.height + 20 * u,
           accent,
           6 * u,
@@ -74,7 +78,11 @@ export async function composePoster(image, body, brand) {
       { x: m + 18 * u, y: m + 12 * u, width: labelWidth - 36 * u, height: 70 * u },
       { family: 'sans', maxSize: 19 * u, minSize: 14 * u, fill: '#15212d', maxLines: 2 },
     );
-    vector.push(rect(m, m, labelWidth, fitted.height + 24 * u, '#ffffff', 5 * u), fitted.svg);
+    const pillWidth = Math.min(
+      labelWidth,
+      Math.max(...fitted.lines.map((line) => measure(line, fitted.size, 'sans'))) + 36 * u,
+    );
+    vector.push(rect(m, m, pillWidth, fitted.height + 24 * u, '#ffffff', 5 * u), fitted.svg);
   }
   if (brand?.tagline) {
     const footer = fitBlock(
@@ -94,6 +102,14 @@ export async function composePoster(image, body, brand) {
         block.box.x + block.box.width <= w &&
         block.box.y + block.height <= h - m * 0.4,
     ),
+    no_text_overlap: blocks.every((block, index) =>
+      blocks.every(
+        (other, j) =>
+          index === j ||
+          block.box.y + block.height <= other.box.y + 0.1 ||
+          other.box.y + other.height <= block.box.y + 0.1,
+      ),
+    ),
     readable_font_sizes: blocks.every(
       (block) => block.size >= Math.floor((block.key === 'headline' ? 38 : 20) * u),
     ),
@@ -103,6 +119,7 @@ export async function composePoster(image, body, brand) {
   };
   if (
     !checks.no_text_overflow ||
+    !checks.no_text_overlap ||
     !checks.readable_font_sizes ||
     checks.text_contrast < 4.5 ||
     (checks.cta_contrast && checks.cta_contrast < 4.5)

@@ -15,6 +15,7 @@ import { images } from './routes/images.js';
 import { dashboardRoutes } from './routes/dashboard.js';
 import { brands } from './routes/brands.js';
 import { posters, posterFiles } from './routes/posters.js';
+import { postWebhook } from './jobs/webhooks.js';
 import { startPosterWorker } from './jobs/worker.js';
 import { publicRoutes } from './routes/public.js';
 const frontend = fileURLToPath(new URL('../frontend/', import.meta.url));
@@ -38,6 +39,7 @@ export function createApp({
   now = () => Math.floor(Date.now() / 1000),
   generateImage,
   fetchImpl,
+  deliverWebhook,
 } = {}) {
   const config = loadConfig(overrides),
     db = openDatabase(config);
@@ -55,6 +57,7 @@ export function createApp({
     encryption,
     now,
     generateImage: generateImage || createGenerator(transport, config),
+    deliverWebhook: deliverWebhook || postWebhook,
   };
   const app = express();
   app.disable('x-powered-by');

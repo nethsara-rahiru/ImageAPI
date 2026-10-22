@@ -3,7 +3,6 @@ import { reserve, finish } from '../services/usage.js';
 import { composePoster } from '../posters/composer.js';
 import { artworkPrompt, planPoster } from '../posters/planner.js';
 import { storeOutput, cleanupOutputs, removeOutput } from './storage.js';
-import { postWebhook } from './webhooks.js';
 import { jobView } from './view.js';
 import { HttpError } from '../lib/errors.js';
 export function startPosterWorker(ctx) {
@@ -13,12 +12,12 @@ export function startPosterWorker(ctx) {
     ticking = false;
   // An interrupted provider call may already have been billed: never replay it automatically.
   for (const row of ctx.db
-    .prepare("SELECT id,usage_id FROM poster_jobs WHERE status='running'")
+    .prepare("SELECT id,usage_id,encrypted_input FROM poster_jobs WHERE status='running'")
     .all()) {
     if (row.usage_id) finish(ctx, row.usage_id, 'unknown', 0, 'interrupted');
     ctx.db
       .prepare(
-        "UPDATE poster_jobs SET status='unknown',stage='interrupted',error_json=?,updated_at=? WHERE id=?",
+        "UPDATE poster_jobs SET status='unknown',stage='interrupted',error_json=?,updated_at=?,webhook_state=? WHERE id=?",
       )
       .run(
         JSON.stringify({
@@ -27,6 +26,9 @@ export function startPosterWorker(ctx) {
             'Generation was interrupted. The provider may have charged. This job was not automatically replayed.',
         }),
         ctx.now(),
+        row.encrypted_input && JSON.parse(ctx.encryption.decrypt(row.encrypted_input)).body.webhook
+          ? 'pending'
+          : 'none',
         row.id,
       );
   }
@@ -123,7 +125,9 @@ export function startPosterWorker(ctx) {
         created_at: ctx.now(),
         job: { id: view.id, status: view.status, error: view.error, result: view.result },
       };
-      success = await postWebhook(body.webhook.url, body.webhook.secret, payload, { now: ctx.now });
+      success = await ctx.deliverWebhook(body.webhook.url, body.webhook.secret, payload, {
+        now: ctx.now,
+      });
     } catch {
       /* Delivery failures are retried, generation is never retried here. */
     }
@@ -131,7 +135,7 @@ export function startPosterWorker(ctx) {
     const delays = [5, 30, 120, 600, 3600];
     ctx.db
       .prepare(
-        'UPDATE poster_jobs SET webhook_state=?,webhook_attempts=?,webhook_next_at=? WHERE id=?',
+        "UPDATE poster_jobs SET webhook_state=?,webhook_attempts=?,webhook_next_at=? WHERE id=? AND webhook_state='pending'",
       )
       .run(
         success ? 'delivered' : attempts >= 5 ? 'failed' : 'pending',

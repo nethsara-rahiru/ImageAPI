@@ -33,12 +33,12 @@ export function planPoster(body, brand) {
     art = { x: Math.round(w * 0.48), y: 0, width: Math.ceil(w * 0.52), height: h };
     zone = {
       x: margin,
-      y: Math.round(h * 0.22),
+      y: Math.round(h * 0.19),
       width: Math.round(w * 0.4) - margin,
-      height: Math.round(h * 0.57),
+      height: Math.round(h * 0.64),
     };
   } else {
-    art = { x: 0, y: 0, width: w, height: Math.round(h * (layout === 'event' ? 0.5 : 0.44)) };
+    art = { x: 0, y: 0, width: w, height: Math.round(h * (layout === 'event' ? 0.52 : 0.48)) };
     zone = {
       x: margin,
       y: art.height + Math.round(h * 0.036),

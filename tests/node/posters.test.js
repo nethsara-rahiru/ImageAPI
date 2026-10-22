@@ -189,3 +189,180 @@ test('webhook destinations reject private networks and signatures cover the exac
   assert.equal(called, true);
   assert.equal(sent, true);
 });
+
+test('retention removes files and input while retaining an idempotency tombstone', async (t) => {
+  let clock = 1792700000;
+  const env = setup(t, { now: () => clock, config: { jobInterval: 30 } }),
+    account = await register(env);
+  await connect(env, account);
+  const created = await session(env.agent, account, 'post', '/v1/posters')
+    .set('Idempotency-Key', 'expires-in-one-hour')
+    .send({ ...input, retention_hours: 1 });
+  const completed = await waitJob(env, created.body.id);
+  assert.equal(completed.body.status, 'completed');
+  clock += 3601;
+  await env.context.posterWorker.kick();
+  const expired = await env.agent.get('/v1/posters/' + created.body.id);
+  assert.equal(expired.body.status, 'expired');
+  assert.equal(expired.body.input, undefined);
+  assert.equal(
+    env.context.db
+      .prepare('SELECT encrypted_input FROM poster_jobs WHERE id=?')
+      .get(created.body.id).encrypted_input,
+    null,
+  );
+  assert.equal((await env.agent.get(`/v1/posters/${created.body.id}/output/png`)).status, 410);
+  const replay = await session(env.agent, account, 'post', '/v1/posters')
+    .set('Idempotency-Key', 'expires-in-one-hour')
+    .send({ ...input, retention_hours: 1 });
+  assert.equal(replay.status, 200);
+  assert.equal(replay.body.status, 'expired');
+  assert.equal(env.calls.length, 1);
+});
+
+test('queued work survives a restart and interrupted work is not billed twice', async (t) => {
+  const { createApp } = await import('../../server/app.js');
+  const { default: request } = await import('supertest');
+  const { reserve } = await import('../../server/services/usage.js');
+  const env = setup(t),
+    account = await register(env);
+  await connect(env, account);
+  await env.context.posterWorker.close();
+  const queued = await session(env.agent, account, 'post', '/v1/posters').send(input);
+  const interrupted = await session(env.agent, account, 'post', '/v1/posters').send({
+    ...input,
+    headline: 'Interrupted poster',
+  });
+  const user = env.context.db.prepare('SELECT id FROM users').get();
+  const usageId = reserve(
+    env.context,
+    { userId: user.id, keyId: null },
+    { provider: 'openai', model: 'gpt-image-1', size: '1024x1024' },
+  );
+  env.context.db
+    .prepare("UPDATE poster_jobs SET status='running',usage_id=? WHERE id=?")
+    .run(usageId, interrupted.body.id);
+  await env.close();
+  let calls = 0;
+  const runtime = createApp({
+    config: { dataDir: env.dataDir, publicOrigin: 'http://testserver', jobInterval: 30 },
+    generateImage: async () => {
+      calls++;
+      return { encoded: png.toString('base64'), width: 120, height: 60 };
+    },
+  });
+  try {
+    const client = request(runtime.app),
+      auth = 'Bearer ' + account.api_key;
+    const old = await client.get('/v1/posters/' + interrupted.body.id).set('Authorization', auth);
+    assert.equal(old.body.status, 'unknown');
+    assert.equal(
+      runtime.context.db.prepare('SELECT status FROM usage WHERE id=?').get(usageId).status,
+      'unknown',
+    );
+    for (let i = 0; i < 150; i++) {
+      const job = await client.get('/v1/posters/' + queued.body.id).set('Authorization', auth);
+      if (job.body.status === 'completed') break;
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
+    assert.equal(
+      (await client.get('/v1/posters/' + queued.body.id).set('Authorization', auth)).body.status,
+      'completed',
+    );
+    assert.equal(calls, 1);
+  } finally {
+    await runtime.close();
+  }
+});
+
+test('provider failure is sanitized, frees monthly quota, and never automatically retries', async (t) => {
+  const { HttpError } = await import('../../server/lib/errors.js');
+  let calls = 0;
+  const env = setup(t, {
+      config: { jobInterval: 30 },
+      generateImage: async () => {
+        calls++;
+        throw new HttpError(424, 'Provider denied model access');
+      },
+    }),
+    account = await register(env);
+  await connect(env, account);
+  const created = await session(env.agent, account, 'post', '/v1/posters').send(input);
+  const result = await waitJob(env, created.body.id);
+  assert.equal(result.body.status, 'failed');
+  assert.equal(result.body.error.detail, 'Provider denied model access');
+  await env.context.posterWorker.kick();
+  assert.equal(calls, 1);
+  assert.equal(env.context.db.prepare('SELECT status FROM usage').get().status, 'failed');
+});
+
+test('preflight rejects incomplete provider/brand and unsafe webhook requests without generating', async (t) => {
+  const env = setup(t),
+    account = await register(env);
+  assert.equal((await session(env.agent, account, 'post', '/v1/posters').send(input)).status, 409);
+  await connect(env, account);
+  assert.equal(
+    (
+      await session(env.agent, account, 'post', '/v1/posters').send({
+        ...input,
+        brand_id: 'brand_' + 'f'.repeat(24),
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await session(env.agent, account, 'post', '/v1/posters').send({
+        ...input,
+        webhook: {
+          url: 'https://127.0.0.1/callback',
+          secret: 'a-long-secret-at-least-24-characters',
+        },
+      })
+    ).status,
+    422,
+  );
+  assert.equal(env.calls.length, 0);
+});
+
+test('webhook retries are signed-delivery retries only and never regenerate artwork', async (t) => {
+  let clock = 1792700000,
+    delivered = 0;
+  const env = setup(t, {
+    now: () => clock,
+    config: { jobInterval: 30 },
+    deliverWebhook: async (url, secret, payload) => {
+      delivered++;
+      assert.equal(secret, 'webhook-secret-at-least-24-characters');
+      assert.equal(payload.type, 'poster.completed');
+      assert.ok(payload.job.result.downloads.png.url);
+      return delivered > 1;
+    },
+  });
+  const account = await register(env);
+  await connect(env, account);
+  const submitted = await session(env.agent, account, 'post', '/v1/posters').send({
+    ...input,
+    webhook: {
+      url: 'https://93.184.216.34/callback',
+      secret: 'webhook-secret-at-least-24-characters',
+    },
+  });
+  assert.equal(submitted.status, 202);
+  await waitJob(env, submitted.body.id);
+  for (let i = 0; i < 30 && delivered === 0; i++) {
+    await env.context.posterWorker.kick();
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.equal(delivered, 1);
+  clock += 31;
+  for (let i = 0; i < 30 && delivered < 2; i++) {
+    await env.context.posterWorker.kick();
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  const result = await env.agent.get('/v1/posters/' + submitted.body.id);
+  assert.equal(result.body.webhook.status, 'delivered');
+  assert.equal(result.body.webhook.attempts, 2);
+  assert.equal(env.calls.length, 1);
+  assert.ok(!result.text.includes('webhook-secret-at-least-24-characters'));
+});

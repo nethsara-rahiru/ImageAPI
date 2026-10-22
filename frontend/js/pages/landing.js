@@ -7,11 +7,11 @@ export async function render() {
       /* HTML */ `<div class="container">
           <section class="hero">
             <div class="hero-content">
-              <div class="eyebrow">The image generation workspace</div>
-              <h1>Big imagination.<br />One simple <span>API.</span></h1>
+              <div class="eyebrow">The automated poster studio</div>
+              <h1>Your next idea.<br />A finished <span>poster.</span></h1>
               <p>
-                Turn a passing thought into something you can see. Connect your AI providers, find
-                your flow, and build with one ImageAPI key.
+                Generate artwork, typeset exact words, and apply your brand automatically. Get a
+                finished poster from the studio or one ImageAPI key.
               </p>
               <div class="hero-actions">
                 <a class="btn btn-primary btn-lg" href="/signup" data-link

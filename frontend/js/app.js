@@ -10,9 +10,18 @@ import * as dashboard from './pages/dashboard.js';
 import * as keys from './pages/api-keys.js';
 import * as playground from './pages/playground.js';
 import * as settings from './pages/settings.js';
+import * as posters from './pages/posters.js';
+import * as brands from './pages/brands.js';
 import * as docs from './pages/docs.js';
 const app = document.querySelector('#app');
-const protectedPaths = new Set(['/dashboard', '/api', '/playground', '/settings']);
+const protectedPaths = new Set([
+  '/dashboard',
+  '/api',
+  '/playground',
+  '/settings',
+  '/posters',
+  '/brands',
+]);
 const titles = {
   '/': 'Ideas into images',
   '/pricing': 'Plans & pricing',
@@ -23,6 +32,8 @@ const titles = {
   '/api': 'API keys & playground',
   '/playground': 'Playground',
   '/settings': 'Settings',
+  '/posters': 'Poster studio',
+  '/brands': 'Brand profiles',
   '/docs': 'Documentation',
 };
 let sequence = 0,
@@ -61,11 +72,15 @@ async function render() {
               ? keys.render()
               : path === '/playground'
                 ? playground.render()
-                : path === '/settings'
-                  ? settings.render()
-                  : path === '/docs'
-                    ? docs.render()
-                    : Promise.reject(new Error('This page doesn’t exist.')));
+                : path === '/posters'
+                  ? posters.render()
+                  : path === '/brands'
+                    ? brands.render()
+                    : path === '/settings'
+                      ? settings.render()
+                      : path === '/docs'
+                        ? docs.render()
+                        : Promise.reject(new Error('This page doesn’t exist.')));
     if (current !== sequence) return;
     app.innerHTML = page.html;
     page.mount?.();
