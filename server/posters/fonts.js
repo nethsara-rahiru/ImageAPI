@@ -85,3 +85,21 @@ export function wrap(text, width, size, family) {
   }
   return lines;
 }
+
+export function verticalMetrics(text, size, family = 'sans') {
+  let ascent = size * 0.86,
+    descent = size * 0.2;
+  for (const { font, text: part } of runs(text, family)) {
+    const shaped = font.layout(part),
+      scale = size / font.unitsPerEm;
+    shaped.glyphs.forEach((glyph, index) => {
+      const bounds = glyph.bbox,
+        pos = shaped.positions[index];
+      if (Number.isFinite(bounds.maxY))
+        ascent = Math.max(ascent, (bounds.maxY + pos.yOffset) * scale);
+      if (Number.isFinite(bounds.minY))
+        descent = Math.max(descent, -(bounds.minY + pos.yOffset) * scale);
+    });
+  }
+  return { ascent, descent };
+}

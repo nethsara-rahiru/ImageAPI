@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { measure, validateCharacters } from './fonts.js';
 import { typeset, fitBlock, contrast } from './typography.js';
 import { planPoster } from './planner.js';
+import { artworkAccent } from './palette.js';
 import { HttpError } from '../lib/errors.js';
 const rect = (x, y, width, height, fill, rx = 0) =>
   `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${rx}" fill="${fill}"/>`;
@@ -22,7 +23,17 @@ export function preflightPoster(body, brand) {
   return { plan, blocks: typeset(body, plan) };
 }
 export async function composePoster(image, body, brand) {
-  const { plan, blocks } = preflightPoster(body, brand);
+  const autoAccent = !body.accent_color && !brand?.accent_color;
+  const selected = autoAccent
+    ? {
+        ...body,
+        accent_color: await artworkAccent(
+          image.encoded,
+          ['bold', 'event'].includes(planPoster(body, brand).layout),
+        ),
+      }
+    : body;
+  const { plan, blocks } = preflightPoster(selected, brand);
   const { width: w, height: h, art, margin: m, accent, foreground, background } = plan;
   const u = Math.min(w, h) / 1080;
   const svg = [];
@@ -94,7 +105,9 @@ export async function composePoster(image, body, brand) {
   }
   const cta = blocks.find((block) => block.key === 'cta');
   const checks = {
-    all_text_preserved: true,
+    all_text_preserved: blocks.every(
+      (block) => block.text.replace(/\s/g, '') === block.lines.join('').replace(/\s/g, ''),
+    ),
     no_text_overflow: blocks.every(
       (block) =>
         block.box.x >= 0 &&
@@ -118,6 +131,7 @@ export async function composePoster(image, body, brand) {
     canvas: { width: w, height: h },
   };
   if (
+    !checks.all_text_preserved ||
     !checks.no_text_overflow ||
     !checks.no_text_overlap ||
     !checks.readable_font_sizes ||
@@ -135,10 +149,29 @@ export async function composePoster(image, body, brand) {
   if (brand?.logo) {
     const logoWidth = Math.round(200 * u),
       logoHeight = Math.round(80 * u);
-    const logo = await sharp(Buffer.from(brand.logo, 'base64'))
-      .resize(logoWidth - 24, logoHeight - 24, { fit: 'contain', background: '#ffffff' })
-      .flatten({ background: '#ffffff' })
-      .extend({ top: 12, bottom: 12, left: 12, right: 12, background: '#ffffff' })
+    const rawLogo = Buffer.from(brand.logo, 'base64');
+    const sample = await sharp(rawLogo)
+      .resize(64, 64, { fit: 'inside' })
+      .ensureAlpha()
+      .raw()
+      .toBuffer();
+    let light = 0,
+      alpha = 0;
+    for (let index = 0; index < sample.length; index += 4) {
+      const a = sample[index + 3] / 255;
+      light +=
+        (sample[index] * 0.2126 + sample[index + 1] * 0.7152 + sample[index + 2] * 0.0722) * a;
+      alpha += a;
+    }
+    const panel = alpha && light / alpha > 180 ? '#15212d' : '#ffffff';
+    const logo = await sharp(rawLogo)
+      .resize(logoWidth - 24, logoHeight - 24, {
+        fit: 'contain',
+        background: panel,
+        withoutEnlargement: true,
+      })
+      .flatten({ background: panel })
+      .extend({ top: 12, bottom: 12, left: 12, right: 12, background: panel })
       .png()
       .toBuffer();
     overlays.push({ input: logo, left: w - m - logoWidth, top: Math.round(m) });
@@ -156,6 +189,7 @@ export async function composePoster(image, body, brand) {
       font: plan.family,
       accent_color: accent,
       background_color: background,
+      palette_source: autoAccent ? 'artwork' : 'brand_or_request',
       width: w,
       height: h,
       text: blocks.map(({ key, text, size, lines, box, height }) => ({

@@ -5,6 +5,7 @@ import { brandSchema } from '../posters/schema.js';
 import { normalizeLogo } from '../posters/logo.js';
 import { readBrand } from '../posters/brands.js';
 import { id } from '../security/tokens.js';
+import { transaction } from '../db/index.js';
 import { HttpError } from '../lib/errors.js';
 export function brands(ctx) {
   const router = Router();
@@ -17,16 +18,18 @@ export function brands(ctx) {
   });
   router.post('/', async (req, res) => {
     const body = parse(brandSchema, req.body);
-    if (
-      ctx.db.prepare('SELECT COUNT(*) AS n FROM brands WHERE user_id=?').get(req.auth.userId).n >=
-      10
-    )
-      throw new HttpError(409, 'You can save up to ten brand profiles');
     body.logo = await normalizeLogo(body.logo, ctx.config);
     const brandId = 'brand_' + id();
-    ctx.db
-      .prepare('INSERT INTO brands VALUES (?,?,?,?)')
-      .run(brandId, req.auth.userId, ctx.encryption.encrypt(JSON.stringify(body)), ctx.now());
+    transaction(ctx.db, () => {
+      if (
+        ctx.db.prepare('SELECT COUNT(*) AS n FROM brands WHERE user_id=?').get(req.auth.userId).n >=
+        10
+      )
+        throw new HttpError(409, 'You can save up to ten brand profiles');
+      ctx.db
+        .prepare('INSERT INTO brands VALUES (?,?,?,?)')
+        .run(brandId, req.auth.userId, ctx.encryption.encrypt(JSON.stringify(body)), ctx.now());
+    });
     res.status(201).json(readBrand(ctx, req.auth.userId, brandId));
   });
   router.put('/:id', async (req, res) => {

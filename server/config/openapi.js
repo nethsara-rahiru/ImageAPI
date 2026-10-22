@@ -1,13 +1,15 @@
+import { posterPaths, posterSchemas } from './poster-openapi.js';
 const json = { 'application/json': { schema: { $ref: '#/components/schemas/GenerationRequest' } } };
 export const openapi = {
   openapi: '3.1.0',
   info: {
     title: 'ImageAPI',
-    version: '1.0.0',
+    version: '2.0.0',
     description:
       'Node.js image generation with each account’s own provider keys. Browser sessions also require X-CSRF-Token on writes.',
   },
   paths: {
+    ...posterPaths,
     '/health': {
       get: {
         summary: 'Process health (not provider readiness)',
@@ -97,6 +99,7 @@ export const openapi = {
       SessionCookie: { type: 'apiKey', in: 'cookie', name: 'imageapi_session' },
     },
     schemas: {
+      ...posterSchemas,
       GenerationRequest: {
         type: 'object',
         additionalProperties: false,

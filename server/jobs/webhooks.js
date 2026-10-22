@@ -30,9 +30,14 @@ export function publicAddress(address) {
 export async function resolveWebhook(value, resolve = lookup) {
   const url = webhookURL(value),
     hostname = url.hostname.replace(/^\[|\]$/g, '');
-  const addresses = ipaddr.isValid(hostname)
-    ? [{ address: hostname, family: ipaddr.parse(hostname).kind() === 'ipv4' ? 4 : 6 }]
-    : await resolve(hostname, { all: true, verbatim: true });
+  let addresses;
+  try {
+    addresses = ipaddr.isValid(hostname)
+      ? [{ address: hostname, family: ipaddr.parse(hostname).kind() === 'ipv4' ? 4 : 6 }]
+      : await resolve(hostname, { all: true, verbatim: true });
+  } catch {
+    throw new HttpError(422, 'Webhook host could not be resolved to public Internet addresses.');
+  }
   if (!addresses.length || addresses.some((item) => !publicAddress(item.address)))
     throw new HttpError(
       422,

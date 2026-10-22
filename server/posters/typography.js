@@ -1,4 +1,4 @@
-import { measure, wrap, outline } from './fonts.js';
+import { measure, wrap, outline, verticalMetrics } from './fonts.js';
 import { HttpError } from '../lib/errors.js';
 export function contrast(a, b) {
   const luminance = (hex) => {
@@ -21,8 +21,14 @@ export function fitBlock(
   { family = 'sans', maxSize, minSize, fill, lineHeight = 1.18, maxLines = 30 },
 ) {
   for (let size = Math.floor(maxSize); size >= minSize; size--) {
-    const lines = wrap(text, box.width, size, family),
-      height = lines.length * size * lineHeight;
+    const lines = wrap(text, box.width, size, family);
+    const metrics = lines.map((line) => verticalMetrics(line, size, family));
+    let height = 0;
+    const baselines = [];
+    for (const metric of metrics) {
+      baselines.push(height + metric.ascent);
+      height += Math.max(size * lineHeight, metric.ascent + metric.descent + size * 0.1);
+    }
     if (
       lines.length <= maxLines &&
       height <= box.height &&
@@ -34,12 +40,11 @@ export function fitBlock(
         size,
         height,
         family,
+        baselines,
         box,
         fill,
         svg: lines
-          .map((line, index) =>
-            outline(line, box.x, box.y + size * (0.91 + index * lineHeight), size, family, fill),
-          )
+          .map((line, index) => outline(line, box.x, box.y + baselines[index], size, family, fill))
           .join(''),
       };
     }
@@ -141,7 +146,7 @@ export function typeset(body, plan) {
         outline(
           line,
           block.box.x,
-          block.box.y + block.size * (0.91 + index * 1.18),
+          block.box.y + block.baselines[index],
           block.size,
           block.family,
           block.fill,

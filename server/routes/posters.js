@@ -6,6 +6,7 @@ import { posterCatalog } from '../posters/catalog.js';
 import { preflightPoster } from '../posters/composer.js';
 import { readBrand } from '../posters/brands.js';
 import { providerKey } from '../services/provider-keys.js';
+import { monthStart } from '../services/usage.js';
 import { rateLimit } from '../services/rate-limit.js';
 import { transaction } from '../db/index.js';
 import { hash, id } from '../security/tokens.js';
@@ -99,6 +100,29 @@ export function posters(ctx) {
         .get(req.auth.userId).n;
       if (count >= ctx.config.posterQueueLimit)
         throw new HttpError(429, 'Your poster queue is full. Wait for jobs to finish.');
+      const retained = ctx.db
+        .prepare(
+          'SELECT COUNT(*) AS n FROM poster_jobs WHERE user_id=? AND encrypted_input IS NOT NULL',
+        )
+        .get(req.auth.userId).n;
+      if (retained >= 100)
+        throw new HttpError(
+          429,
+          'You have 100 retained poster inputs. Delete old jobs or wait for their retention period to expire.',
+        );
+      const used = ctx.db
+        .prepare(
+          "SELECT COUNT(*) AS n FROM usage WHERE user_id=? AND created_at>=? AND status IN ('success','pending','unknown')",
+        )
+        .get(req.auth.userId, monthStart(ctx.now())).n;
+      const queued = ctx.db
+        .prepare("SELECT COUNT(*) AS n FROM poster_jobs WHERE user_id=? AND status='queued'")
+        .get(req.auth.userId).n;
+      if (used + queued >= ctx.config.freeLimit)
+        throw new HttpError(
+          429,
+          'Your monthly allowance is used or reserved by queued work. Wait for a job to fail/cancel or for the next UTC month.',
+        );
       const jobId = 'poster_' + id(),
         now = ctx.now();
       ctx.db

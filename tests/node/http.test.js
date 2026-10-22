@@ -34,7 +34,7 @@ test('health identifies Node and only Free is an active plan', async (t) => {
   const env = setup(t);
   assert.deepEqual((await env.request.get('/health')).body, {
     status: 'ok',
-    version: '1.0.0',
+    version: '2.0.0',
     runtime: 'node',
   });
   const plans = (await env.request.get('/api/plans')).body.plans;

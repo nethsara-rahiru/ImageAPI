@@ -366,3 +366,79 @@ test('webhook retries are signed-delivery retries only and never regenerate artw
   assert.equal(env.calls.length, 1);
   assert.ok(!result.text.includes('webhook-secret-at-least-24-characters'));
 });
+
+test('queued jobs reserve remaining monthly submission capacity before generation', async (t) => {
+  const env = setup(t, { config: { freeLimit: 1 } }),
+    account = await register(env);
+  await connect(env, account);
+  await env.context.posterWorker.close();
+  const one = await session(env.agent, account, 'post', '/v1/posters').send(input);
+  assert.equal(one.status, 202);
+  const two = await session(env.agent, account, 'post', '/v1/posters').send({
+    ...input,
+    headline: 'Another poster',
+  });
+  assert.equal(two.status, 429);
+  assert.equal(env.calls.length, 0);
+  await session(env.agent, account, 'delete', '/v1/posters/' + one.body.id);
+  assert.equal((await session(env.agent, account, 'post', '/v1/posters').send(input)).status, 202);
+});
+
+test('all canvas sizes and multilingual glyph metrics remain inside the layout', async () => {
+  for (const size of ['square', 'portrait', 'story', 'landscape', 'a4']) {
+    const body = posterSchema.parse({ ...input, size });
+    const result = await composePoster(
+      { encoded: png.toString('base64'), width: 120, height: 60 },
+      body,
+      null,
+    );
+    assert.equal(result.design.quality.checks.no_text_overlap, true);
+    assert.equal(result.design.quality.checks.all_text_preserved, true);
+    assert.equal(result.design.palette_source, 'artwork');
+  }
+  const body = posterSchema.parse({
+    ...input,
+    headline: 'සුබ දවසක්',
+    subtitle: 'வணக்கம்',
+    details: ['مرحبا بكم'],
+  });
+  const result = await composePoster(
+    { encoded: png.toString('base64'), width: 120, height: 60 },
+    body,
+    null,
+  );
+  assert.equal(result.design.quality.passed, true);
+});
+
+test('transparent white logos receive a dark backing and brand colours override sampled accents', async () => {
+  const logo = await sharp({
+    create: {
+      width: 120,
+      height: 60,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    },
+  })
+    .png()
+    .toBuffer();
+  const brand = {
+    name: 'White Logo',
+    tagline: '',
+    font: 'sans',
+    accent_color: '#0044aa',
+    background_color: '#ffffff',
+    logo: logo.toString('base64'),
+  };
+  const result = await composePoster(
+    { encoded: png.toString('base64'), width: 120, height: 60 },
+    posterSchema.parse(input),
+    brand,
+  );
+  assert.equal(result.design.palette_source, 'brand_or_request');
+  assert.equal(result.design.accent_color, '#0044aa');
+  const { data, info } = await sharp(result.buffer).raw().toBuffer({ resolveWithObject: true });
+  const x = 1080 - 70 - 200,
+    y = 70;
+  const index = (y * info.width + x) * info.channels;
+  assert.ok(data[index] < 60 && data[index + 1] < 60 && data[index + 2] < 60);
+});

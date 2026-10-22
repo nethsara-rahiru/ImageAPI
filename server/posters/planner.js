@@ -3,10 +3,13 @@ import { posterSizes } from './catalog.js';
 export function chooseLayout(body) {
   if (body.layout !== 'auto') return body.layout;
   const words = `${body.prompt} ${body.headline}`.toLowerCase();
-  if (/sale|discount|offer|shop|launch|buy|%/.test(words)) return 'sale';
-  if (/concert|festival|event|party|music|conference|workshop/.test(words)) return 'event';
-  if (/luxury|gallery|exhibition|art|editorial|fashion/.test(words)) return 'editorial';
-  if (/minimal|wellness|spa|yoga|calm/.test(words)) return 'minimal';
+  if (/\b(sale|discount|offer|shop|launch|buy)\b|%/.test(words)) return 'sale';
+  if (/\b(concert|festival|event|party|music|conference|workshop)\b/.test(words)) return 'event';
+  if (
+    /\b(luxury|gallery|exhibition|art|architecture|architectural|editorial|fashion)\b/.test(words)
+  )
+    return 'editorial';
+  if (/\b(minimal|wellness|spa|yoga|calm)\b/.test(words)) return 'minimal';
   return 'bold';
 }
 export function planPoster(body, brand) {
@@ -69,7 +72,7 @@ export function artworkPrompt(body, plan) {
   const palette = plan.dark
     ? 'cinematic rich shadows and luminous accents'
     : 'refined natural light and carefully balanced tones';
-  const prefix = `Professional poster artwork, no text, no lettering, no typography, no logo, no watermark. ${palette}. A single strong focal subject, uncluttered composition, premium commercial photography or illustration. `;
+  const prefix = `Professional poster artwork, no text, no lettering, no typography, no logo, no watermark. ${palette}. A single strong focal subject, uncluttered composition, premium commercial photography or illustration. Harmonise the palette with ${plan.accent} and ${plan.background}. `;
   const suffix = ` Keep important subjects in the central 70 percent for cropping. Artwork direction: ${body.prompt}`;
   // Reserve instructions even when the caller supplies a very long prompt.
   return (prefix + suffix).slice(0, body.provider === 'cloudflare' ? 2048 : 6000);

@@ -1,9 +1,9 @@
 {
   "name": "imageapi",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "A Node.js image generation platform with a vanilla JavaScript workspace.",
+  "description": "Automated poster studio with precise typography, per-user AI keys, durable jobs, and a vanilla JavaScript frontend.",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -13,8 +13,9 @@
     "test": "node --test tests/node/*.test.js",
     "test:browser": "playwright test",
     "check": "node scripts/check.js",
-    "format": "prettier --write server frontend tests scripts playwright.config.js",
-    "format:check": "prettier --check server frontend tests scripts playwright.config.js"
+    "format": "prettier --write server frontend tests scripts playwright.config.js examples",
+    "format:check": "prettier --check server frontend tests scripts playwright.config.js examples",
+    "poster:samples": "node scripts/render-poster-samples.js"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
