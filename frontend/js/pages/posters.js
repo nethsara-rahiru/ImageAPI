@@ -1,3 +1,4 @@
+import { requestKey } from '../core/request-key.js';
 import { api } from '../core/api.js';
 import { escape, date } from '../core/html.js';
 import { formError, clearError } from '../core/forms.js';
@@ -31,7 +32,10 @@ export async function render() {
   let disposed = false,
     timer = null,
     current = null,
-    lastPreview = '';
+    lastPreview = '',
+    offset = 0,
+    submission = null,
+    submittingPoster = false;
   return {
     html: workspaceLayout(
       `${pageHeading('From idea to finished poster.', 'Exact words. Considered typography. Your artwork, automatically composed.', '<a href="/brands" data-link class="btn btn-secondary">' + icon('layers') + ' Brand profiles</a>')}
@@ -58,7 +62,7 @@ export async function render() {
       <div id="poster-provider-note" class="notice small"></div>
       <button class="btn btn-primary btn-block" type="submit" id="create-poster">${icon('sparkles')} Create finished poster</button><p class="small muted">Your provider’s allowance applies. Jobs keep running if you leave. We check text fit and contrast; artwork still needs your review before publishing.</p></form></section>
       <section class="card poster-preview-card"><div class="card-head"><h3>Your finished poster</h3><span id="poster-state" class="badge badge-blue">READY FOR AN IDEA</span></div><div id="poster-preview" class="poster-preview"><div class="poster-empty">${icon('image')}<h2>Let the design come together.</h2><p>Tell us the artwork and the exact words.<br>We’ll take care of hierarchy, spacing, and legibility.</p><div class="poster-empty-demo"><span>YOUR NEXT</span><strong>BIG<br>IDEA.</strong><span>ARTWORK + PRECISE TYPOGRAPHY</span></div></div></div><div id="poster-downloads" class="card-body"></div><div id="poster-quality" class="card-body small muted"></div></section></div>
-      <section class="card poster-jobs"><div class="card-head"><div><h3>Your poster library</h3><p class="small muted">PNG, JPEG, and WebP included. Links last 15 minutes; refresh them before sharing.</p></div><button class="btn btn-secondary btn-sm" data-refresh-posters>Refresh library</button></div><div id="poster-job-list"></div></section>`,
+      <section class="card poster-jobs"><div class="card-head"><div><h3>Your poster library</h3><p class="small muted">PNG, JPEG, and WebP included. Links last 15 minutes; refresh them before sharing.</p></div><button class="btn btn-secondary btn-sm" data-refresh-posters>Refresh library</button></div><div id="poster-job-list"></div><div class="pagination"><span id="poster-library-count"></span><div><button class="btn btn-secondary btn-sm" data-poster-prev>Previous posters</button><button class="btn btn-secondary btn-sm" data-poster-next>Next posters</button></div></div></section>`,
       '/posters',
     ),
     mount() {
@@ -122,7 +126,12 @@ export async function render() {
           quality.innerHTML = '';
         }
       }
-      function library(jobs) {
+      function library(jobs, total) {
+        document.querySelector('#poster-library-count').textContent = total
+          ? `${offset + 1}–${Math.min(offset + 20, total)} of ${total} posters`
+          : 'No posters yet';
+        document.querySelector('[data-poster-prev]').disabled = offset === 0;
+        document.querySelector('[data-poster-next]').disabled = offset + 20 >= total;
         const box = document.querySelector('#poster-job-list');
         box.innerHTML = jobs.length
           ? `<div class="table-scroll"><table><thead><tr><th>Poster</th><th>Status</th><th>Created / expires</th><th>Actions</th></tr></thead><tbody>${jobs.map((job) => `<tr><td><strong>${escape(job.input?.headline || job.id)}</strong><div class="small muted">${escape(job.input?.size || '')} · ${escape(job.input?.provider || '')}</div></td><td><span class="badge ${job.status === 'completed' ? 'badge-green' : job.status === 'failed' ? 'badge-red' : ''}">${escape(job.status)}</span></td><td>${date(job.created_at)}<div class="small muted">Expires ${date(job.expires_at)}</div></td><td><div class="poster-row-actions"><button class="btn btn-ghost btn-sm" data-view-poster="${job.id}">View</button>${job.input ? `<button class="btn btn-ghost btn-sm" data-copy-poster="${job.id}">Use content</button>` : ''}${job.status !== 'running' && job.status !== 'deleted' ? `<button class="btn btn-ghost btn-sm" data-delete-poster="${job.id}">${job.status === 'queued' ? 'Cancel' : 'Delete'}</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>`
@@ -162,9 +171,11 @@ export async function render() {
       async function refresh() {
         if (disposed) return;
         try {
-          const { jobs } = await api('/v1/posters');
+          const requestedOffset = offset;
+          const { jobs, total } = await api('/v1/posters?limit=20&offset=' + requestedOffset);
+          if (requestedOffset !== offset) return;
           if (disposed) return;
-          library(jobs);
+          library(jobs, total);
           const selected =
             jobs.find((j) => j.id === current) ||
             jobs.find((j) => j.status === 'running' || j.status === 'queued') ||
@@ -175,11 +186,21 @@ export async function render() {
         }
       }
       document.querySelector('[data-refresh-posters]').addEventListener('click', refresh);
-      library(initial.jobs);
+      document.querySelector('[data-poster-prev]').addEventListener('click', () => {
+        offset = Math.max(0, offset - 20);
+        refresh();
+      });
+      document.querySelector('[data-poster-next]').addEventListener('click', () => {
+        offset += 20;
+        refresh();
+      });
+      library(initial.jobs, initial.total);
       if (initial.jobs.length) show(initial.jobs[0]);
       timer = setInterval(refresh, 5000);
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
+        if (submittingPoster) return;
+        submittingPoster = true;
         clearError(form);
         button.disabled = true;
         const body = Object.fromEntries(new FormData(form));
@@ -189,18 +210,25 @@ export async function render() {
           .filter(Boolean);
         body.retention_hours = Number(body.retention_hours);
         if (!body.brand_id) delete body.brand_id;
+        const encoded = JSON.stringify(body);
+        if (!submission || submission.encoded !== encoded)
+          submission = { encoded, key: requestKey() };
         try {
           const job = await api('/v1/posters', {
             method: 'POST',
             body,
-            idempotencyKey: crypto.randomUUID(),
+            idempotencyKey: submission.key,
           });
+          submission = null;
+          offset = 0;
+          if (disposed) return;
           show(job);
           await refresh();
           toast('Poster queued. You can leave this page while it finishes.');
         } catch (error) {
           formError(form, error);
         } finally {
+          submittingPoster = false;
           button.disabled = !providers.find((p) => p.id === provider.value).connected;
         }
       });

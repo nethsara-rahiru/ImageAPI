@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 test('brand profiles and automated poster studio complete an end-to-end job', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
+  });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/signup');
