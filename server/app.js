@@ -13,6 +13,9 @@ import { accounts } from './routes/accounts.js';
 import { keys } from './routes/keys.js';
 import { images } from './routes/images.js';
 import { dashboardRoutes } from './routes/dashboard.js';
+import { brands } from './routes/brands.js';
+import { posters, posterFiles } from './routes/posters.js';
+import { startPosterWorker } from './jobs/worker.js';
 import { publicRoutes } from './routes/public.js';
 const frontend = fileURLToPath(new URL('../frontend/', import.meta.url));
 const pages = new Set([
@@ -25,6 +28,8 @@ const pages = new Set([
   '/api',
   '/playground',
   '/settings',
+  '/posters',
+  '/brands',
   '/docs',
 ]);
 
@@ -69,6 +74,10 @@ export function createApp({
   app.use('/api', dashboardRoutes(ctx));
   app.use('/api', keys(ctx));
   app.use('/v1/images', images(ctx));
+  app.use('/v1/brands', brands(ctx));
+  app.use('/v1/posters', posters(ctx));
+  app.use('/v1/poster-files', posterFiles(ctx));
+  ctx.posterWorker = startPosterWorker(ctx);
   app.use(
     '/static',
     express.static(frontend, {
@@ -94,6 +103,7 @@ export function createApp({
     async close() {
       if (closed) return;
       closed = true;
+      await ctx.posterWorker.close();
       await transport.close();
       db.close();
     },

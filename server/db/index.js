@@ -13,12 +13,12 @@ export function openDatabase(config) {
     db.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=15000; PRAGMA journal_mode=WAL;');
     const version = db.prepare('PRAGMA user_version').get().user_version;
     if (version > 3) throw new Error('Database schema is newer than this ImageAPI release');
-    if (version === 1) {
+    if (version === 1 || version === 2) {
       const folder = path.join(config.dataDir, 'backups');
       mkdirSync(folder, { recursive: true, mode: 0o700 });
       const prefix = path.join(
         folder,
-        `before-node-${Date.now()}-${randomBytes(4).toString('hex')}`,
+        `${version === 1 ? 'before-node' : 'before-posters'}-${Date.now()}-${randomBytes(4).toString('hex')}`,
       );
       db.exec(`VACUUM INTO '${(prefix + '.sqlite3').replaceAll("'", "''")}'`);
       chmodSync(prefix + '.sqlite3', 0o600);

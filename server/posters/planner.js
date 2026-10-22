@@ -1,3 +1,4 @@
+import { inkFor } from './typography.js';
 import { posterSizes } from './catalog.js';
 export function chooseLayout(body) {
   if (body.layout !== 'auto') return body.layout;
@@ -25,7 +26,7 @@ export function planPoster(body, brand) {
   const paper = brand?.background_color || (layout === 'minimal' ? '#f1f3ed' : '#f8f3e9');
   const dark = ['bold', 'event'].includes(layout),
     background = dark ? '#101b29' : paper,
-    foreground = dark ? '#ffffff' : '#17242b';
+    foreground = inkFor(background);
   const margin = Math.round(Math.min(w, h) * 0.065);
   let art, zone;
   if (landscape) {
