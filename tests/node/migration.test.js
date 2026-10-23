@@ -94,7 +94,7 @@ test('legacy database migrates with backup and preserves accounts, sessions, key
     await runtime.close();
     rmSync(dataDir, { recursive: true, force: true });
   });
-  assert.equal(runtime.context.db.prepare('PRAGMA user_version').get().user_version, 2);
+  assert.equal(runtime.context.db.prepare('PRAGMA user_version').get().user_version, 3);
   const backups = readdirSync(path.join(dataDir, 'backups'));
   assert.equal(backups.length, 2);
   const backup = new DatabaseSync(

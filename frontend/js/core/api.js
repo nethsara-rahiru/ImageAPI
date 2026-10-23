@@ -6,8 +6,9 @@ export class ApiError extends Error {
     this.requestId = requestId;
   }
 }
-export async function api(path, { method = 'GET', body, signal } = {}) {
+export async function api(path, { method = 'GET', body, signal, idempotencyKey } = {}) {
   const headers = { Accept: 'application/json' };
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (state.csrf && !['GET', 'HEAD'].includes(method)) headers['X-CSRF-Token'] = state.csrf;
   let response;

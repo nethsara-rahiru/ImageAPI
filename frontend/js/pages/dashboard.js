@@ -23,9 +23,7 @@ export async function render() {
         'A little overview.',
         `Welcome back, ${state.user.name.split(' ')[0]}. Here’s how your ideas are taking shape.`,
         /* HTML */ `<div class="date-label">${icon('calendar')}${escape(month)}</div>
-          <a class="btn btn-primary" href="/playground" data-link
-            >${icon('plus')} Create an image</a
-          >`,
+          <a class="btn btn-primary" href="/posters" data-link>${icon('plus')} Create a poster</a>`,
       )}${
         s.connected_providers === 0
           ? /* HTML */ `<section class="welcome-card">

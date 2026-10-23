@@ -11,9 +11,9 @@ async function files(dir) {
   ).flat();
 }
 let count = 0;
-for (const dir of ['server', 'frontend/js', 'scripts', 'tests'])
+for (const dir of ['server', 'frontend/js', 'scripts', 'tests', 'examples'])
   for (const file of await files(dir))
-    if (file.endsWith('.js')) {
+    if (/\.m?js$/.test(file)) {
       const result = spawnSync(process.execPath, ['--check', file], { stdio: 'inherit' });
       if (result.status !== 0) process.exit(1);
       count++;

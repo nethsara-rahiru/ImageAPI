@@ -9,10 +9,11 @@ export async function render() {
     html: marketingLayout(
       /* HTML */ `<div class="container docs-layout">
         <nav class="docs-nav" aria-label="Documentation sections">
-          <a href="#quickstart">Quickstart</a><a href="#authentication">Authentication</a
-          ><a href="#generate">Generate an image</a><a href="#providers">Providers & models</a
-          ><a href="#response">Response</a><a href="#examples">Code examples</a
-          ><a href="#errors">Errors & limits</a><a href="#privacy">Keys & data</a>
+          <a href="#posters">Automated posters</a><a href="#quickstart">Image quickstart</a
+          ><a href="#authentication">Authentication</a><a href="#generate">Generate an image</a
+          ><a href="#providers">Providers & models</a><a href="#response">Response</a
+          ><a href="#examples">Code examples</a><a href="#errors">Errors & limits</a
+          ><a href="#privacy">Keys & data</a>
         </nav>
         <article class="docs-content">
           <div class="eyebrow">A small API. A big canvas.</div>
@@ -21,6 +22,81 @@ export async function render() {
             ImageAPI connects your application to image models through one account and one
             consistent endpoint. You bring your own provider keys; generation is billed by those
             providers.
+          </p>
+          <h2 id="posters">A finished poster, without manual layout.</h2>
+          <p>
+            Use <code>POST /v1/posters</code> for artwork, exact typography, and your saved brand in
+            one background job. The older image endpoint returns artwork only.
+          </p>
+          ${codePanel(JSON.stringify({ provider: 'cloudflare', prompt: 'A tropical music festival at golden hour, editorial photography', headline: 'SUMMER NIGHTS', subtitle: 'Live music by the ocean', details: ['15 AUGUST · 6 PM', 'OCEAN PARK'], cta: 'BOOK YOUR PLACE', size: 'portrait', layout: 'auto', format: 'png', retention_hours: 24 }, null, 2), { label: 'POST /v1/posters · JSON', id: 'poster-request-example', footer: 'Authenticate with your ImageAPI bearer key; connect the artwork provider in Settings first.' })}
+          <ol>
+            <li>
+              Submit JSON with <code>Authorization: Bearer YOUR_IMAGEAPI_KEY</code> and a unique
+              <code>Idempotency-Key</code> header (8–128 characters). Keep the same key when
+              retrying the same submission after a network error.
+            </li>
+            <li>
+              A <code>202</code> response returns a job ID and a <code>Location</code> header. Poll
+              <code>GET /v1/posters/{id}</code> until the status is <code>completed</code>,
+              <code>failed</code>, or <code>unknown</code>.
+            </li>
+            <li>
+              When complete, use <code>result.downloads.png.url</code> (or
+              <code>jpeg</code>/<code>webp</code>) to get the finished binary poster. Links last up
+              to 15 minutes. Poll again for fresh links, or use authenticated
+              <code>GET /v1/posters/{id}/output/png</code>.
+            </li>
+          </ol>
+          <p>
+            Sizes: <code>square</code> (1080×1080), <code>portrait</code> (1080×1350),
+            <code>story</code> (1080×1920), <code>landscape</code> (1920×1080), and
+            <code>a4</code> (1654×2339, about 141 dpi). PNG, JPEG, and WebP are included with every
+            job. See <code>GET /v1/posters/catalog</code> for available layouts and fonts.
+          </p>
+          <p>
+            The exact headline, subtitle, details, and call to action are rendered separately from
+            AI artwork. Auto layout chooses a composition from the content; text fitting, minimum
+            type sizes, overlap checks, and contrast checks run automatically. When no brand colour
+            is supplied, an accent is sampled from the artwork. Copy that cannot fit legibly is
+            rejected rather than cut off. Artwork subject accuracy and logo identity still need
+            review before publishing.
+          </p>
+          <h3>Reusable brand profiles</h3>
+          <p>
+            Save up to ten profiles with <code>POST /v1/brands</code> or the
+            <a href="/brands" data-link>Brand profiles page</a>. Fields are <code>name</code>,
+            <code>tagline</code>, <code>accent_color</code>, <code>background_color</code>,
+            <code>font</code> (sans/display/serif), and optional base64
+            <code>logo</code> (PNG/JPEG/WebP under 550 KB). Pass the returned
+            <code>brand_id</code> when making a poster. Jobs retain their original brand snapshot.
+            List, replace, and delete profiles through <code>/v1/brands</code> and
+            <code>/v1/brands/{id}</code>.
+          </p>
+          <h3>Webhooks and safe retries</h3>
+          <p>
+            Optionally include <code>webhook: { url, secret }</code>, with a public HTTPS URL on
+            port 443 and a secret of at least 24 characters. Receive <code>poster.completed</code>,
+            <code>poster.failed</code>, or <code>poster.unknown</code> events. Verify the
+            <code>X-ImageAPI-Signature</code> header:
+            <code>t=timestamp,v1=HMAC-SHA256(secret, timestamp + "." + rawBody)</code>. Reject
+            timestamps older than five minutes and deduplicate <code>event_id</code>. Delivery is
+            attempted up to five times with backoff; only deliveries are retried, never image
+            generation. Webhook secrets are encrypted and never returned.
+          </p>
+          <p>
+            Poster input is encrypted and output files are private. Retention defaults to 24 hours
+            and can be set to 1–168 hours. <code>DELETE /v1/posters/{id}</code> cancels queued work
+            or deletes terminal output and revokes its links. Running provider requests cannot
+            safely be cancelled. Queued jobs survive restarts; interrupted calls become
+            <code>unknown</code> because the provider may already have charged. A lightweight
+            idempotency tombstone remains after output expiry, preventing accidental resubmission
+            with an old key.
+          </p>
+          <p>
+            See the repository’s <code>examples/poster.mjs</code> for a complete submit → poll →
+            download client and <code>examples/verify-webhook.mjs</code> for signature verification.
+            These endpoints use the same monthly allowance as image generation. Automatic
+            composition does not incur a second AI call.
           </p>
           <h2 id="quickstart">Your first image, in three steps.</h2>
           <ol>
@@ -254,16 +330,19 @@ export async function render() {
             may still apply to timed-out or failed requests.
           </p>
           <p>
-            Generation has no automatic retry and no idempotency guarantee. Don’t automatically
-            retry timeouts: inspect your provider’s usage first to avoid duplicate charges. Requests
-            may take up to three minutes. An interrupted request is marked “Unknown” after five
-            minutes when usage is viewed or the next generation is attempted.
+            The synchronous image endpoint has no automatic retry or idempotency guarantee. Poster
+            jobs support Idempotency-Key and durable polling. Don’t automatically retry timeouts:
+            inspect your provider’s usage first to avoid duplicate charges. Requests may take up to
+            three minutes. An interrupted request is marked “Unknown” after five minutes when usage
+            is viewed or the next generation is attempted.
           </p>
           <h2 id="privacy">Your keys. Your data.</h2>
           <p>
             Provider keys are encrypted with AES-256-GCM and never returned in full. ImageAPI bearer
             keys and session tokens are stored as hashes. Passwords use salted scrypt. Only model,
-            provider, size, source, status, and timing metadata is kept for usage reporting.
+            provider, size, source, status, and timing metadata is kept in usage logs. Poster jobs
+            additionally retain encrypted copy, a brand snapshot, and private output files for their
+            configured lifetime.
           </p>
           <p>
             Save your recovery code. There are no password reset emails in this local release.

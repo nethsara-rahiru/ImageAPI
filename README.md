@@ -1,8 +1,8 @@
-# ImageAPI · Node.js
+# ImageAPI · Automated Poster Studio
 
-A complete image-generation platform built with **Node.js 24, Express, SQLite, and vanilla HTML/CSS/JavaScript**. There is no Python runtime or frontend build step.
+An automated poster design and image-generation platform built with **Node.js 24, Express, SQLite, and vanilla HTML/CSS/JavaScript**. There is no Python runtime or frontend build step.
 
-Users create an account, connect their own OpenAI/Gemini/fal.ai/Cloudflare credentials, get personal ImageAPI keys, generate in a playground or over the API, and track real usage.
+Users create an account, connect their own OpenAI/Gemini/fal.ai/Cloudflare credentials, get personal ImageAPI keys, generate complete posters in the Studio or over the API, and track real usage. Poster typography and logos are composed separately from AI artwork.
 
 ## Run
 
@@ -23,6 +23,8 @@ For the existing Ubuntu VPS, upgrades, SSH tunnel, systemd, and HTTPS setup, see
 
 ## Features
 
+- Automatic finished posters: five design directions, exact vector typography, artwork-matched accents, saved brand profiles, raster logos, five canvas sizes, and readability checks.
+- Durable background jobs, account-scoped idempotency, signed short-lived downloads, configurable retention, and signed webhooks with delivery-only retries.
 - Email/password registration, login/logout, recovery codes, password changes, and account deletion.
 - Persistent SQLite accounts, sessions, API keys, provider credentials, and usage metadata.
 - Async salted scrypt password hashing, HttpOnly cookies, CSRF/origin checks, bounded JSON/uploads, persistent rate limits, and security headers.
@@ -123,7 +125,7 @@ await writeFile('image.png', Buffer.from(result.data[0].b64_json, 'base64'));
 | `size` | `1024x1024` (default), `1536x1024`, `1024x1536`; Cloudflare: native square only |
 | `quality` | `auto` (default); OpenAI also supports `low`, `medium`, `high` |
 
-Unknown generation fields are rejected. One verified, metadata-stripped PNG is returned per request. JSON includes `id`, `created`, `provider`, `model`, and `data[0]` with `b64_json`, `mime_type`, `width`, and `height`. There are no permanent image URLs. Gemini maps size to aspect ratio (1:1, 3:2, 2:3); actual pixels depend on the model. Provider account access, region, moderation, quota, pricing, and model availability apply.
+Unknown generation fields are rejected. One verified, metadata-stripped PNG is returned per request. JSON includes `id`, `created`, `provider`, `model`, and `data[0]` with `b64_json`, `mime_type`, `width`, and `height`. The synchronous endpoint has no permanent image URLs; the poster endpoint supplies short-lived download links. Gemini maps size to aspect ratio (1:1, 3:2, 2:3); actual pixels depend on the model. Provider account access, region, moderation, quota, pricing, and model availability apply.
 
 `/v1/images/generate` remains an authenticated alias with the same JSON contract. No platform-owned OpenAI/Gemini/fal/Cloudflare key is used. The caller must first save a credential for that provider under their own account.
 
@@ -160,7 +162,7 @@ Passwords use async scrypt (N=32768, r=8, p=3) with random salts. Session and AP
 
 SQLite uses WAL, foreign keys, indexed request metadata, short synchronous transactions, and owner-private data files. It targets a single application instance with durable local storage. Do not use stateless multi-replica hosting without replacing/coordinating persistence and limits. Password hashing and Sharp image work run outside the JavaScript event loop; provider HTTP is asynchronous.
 
-Prompts and image bytes are processed in memory, never persisted to application storage. Metadata includes provider/model/size/source/status/timing. Providers process prompts under their own policies. Full provider keys and bearer secrets are never logged or returned after creation.
+Synchronous image prompts and bytes are processed in memory, never persisted to application storage. Poster jobs retain encrypted input and brand snapshots plus private output files for 1–168 hours (24 hours by default); expiry/delete removes the copy and files. A minimal idempotency tombstone and usage metadata remain. Brand profiles persist until deleted. Metadata includes provider/model/size/source/status/timing. Providers process prompts under their own policies. Full provider keys and bearer secrets are never logged or returned after creation.
 
 There is no SMTP or email verification. Recovery uses the one-time code shown at signup; it rotates the code and revokes all sessions and ImageAPI keys. A password change revokes sessions but preserves ImageAPI keys. Account deletion removes active database records; backups remain subject to operator retention.
 
@@ -258,3 +260,94 @@ The model defaults automatically when omitted. This model accepts at most 2,048 
 Cloudflare offers 10,000 free Neurons per day, shared across Workers AI models; the number of images varies with compute usage. Provider limits and ImageAPI’s monthly allowance are separate. There is no platform-owned token or automatic fallback. No database migration or additional package is required for this integration.
 
 References: [Cloudflare REST setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/), [FLUX Schnell schema](https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/), [current free allocation](https://developers.cloudflare.com/workers-ai/platform/pricing/).
+
+## Finished posters (v2)
+
+Open **Poster studio** after connecting an artwork provider. Enter the exact headline and optional subtitle/details/CTA separately from the artwork prompt. Layout, font fitting, colour harmonisation, text contrast, and export composition are automatic; there is no manual positioning stage. **Brand profiles** save your logo, colours, type style, and tagline. Each job snapshots its brand so later edits do not change existing posters.
+
+### Complete API workflow
+
+Use your ImageAPI key, not the Cloudflare token, for these requests:
+
+```bash
+curl http://127.0.0.1:8080/v1/posters \
+  -H "Authorization: Bearer $IMAGEAPI_KEY" \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: campaign-summer-2026-v1' \
+  --data '{
+    "provider": "cloudflare",
+    "prompt": "A tropical music festival at golden hour, premium editorial photography",
+    "headline": "SUMMER NIGHTS",
+    "subtitle": "Live music by the ocean",
+    "details": ["15 AUGUST · 6 PM", "OCEAN PARK"],
+    "cta": "BOOK YOUR PLACE",
+    "layout": "auto",
+    "size": "portrait",
+    "format": "png",
+    "retention_hours": 24
+  }'
+```
+
+The response is **202 Accepted** with a job `id` and `Location`. Poll `GET /v1/posters/{id}` using the same bearer key. When `status` becomes `completed`, `result.downloads.png.url` (and `jpeg`/`webp`) returns the final binary poster without another AI call. Links expire after at most 15 minutes; fetch the job again for fresh links. Authenticated `GET /v1/posters/{id}/output/png` also downloads the final file. `result` includes the layout, selected palette, typography manifest, dimensions, format sizes, and quality report. Errors appear in the job’s `error` field.
+
+For a fully automated client that submits, polls, and writes `poster.png`:
+
+```bash
+IMAGEAPI_KEY=your_imageapi_key IMAGEAPI_BASE_URL=http://127.0.0.1:8080 node examples/poster.mjs
+```
+
+| Field | Limits/default |
+| --- | --- |
+| `prompt` | Required artwork direction, up to 4,000 characters; provider instructions reserve space and Cloudflare’s prompt is bounded to 2,048 |
+| `headline` | Required, up to 160 characters |
+| `subtitle` | Up to 260 characters |
+| `details` | Up to five strings, each 120 characters |
+| `eyebrow`, `cta` | Each up to 48 characters |
+| `provider`, `model` | Cloudflare by default; selected provider’s default model when omitted |
+| `layout` | `auto`, `editorial`, `minimal`, `bold`, `event`, `sale` |
+| `size` | `square` 1080×1080; `portrait` 1080×1350 (default); `story` 1080×1920; `landscape` 1920×1080; `a4` 1654×2339 (about 141 dpi, not 300 dpi print output) |
+| `brand_id` | Optional owned brand profile; job takes an encrypted snapshot |
+| `accent_color`, `font` | Optional overrides; six-digit hex; `sans`/`display`/`serif` |
+| `format` | Preferred download format: `png` default, `jpeg`, `webp`; all three generated |
+| `retention_hours` | 1–168 hours; 24 by default, measured from submission |
+| `webhook` | Optional `{ "url": "https://your-domain/callback", "secret": "at-least-24-characters" }` |
+
+### Brands, jobs, and retention
+
+- `GET/POST /v1/brands`, `PUT/DELETE /v1/brands/{id}` manage up to ten owned profiles. Profile fields: `name`, `tagline`, `accent_color`, `background_color`, `font`, optional base64 `logo`. Logos are validated/re-encoded PNG/JPEG/WebP under 550 KB and four million pixels. SVG, remote URLs, and arbitrary font files are not accepted. PUT replaces the entire profile; omit `logo` to clear it.
+- `GET /v1/posters/catalog` returns layouts, fonts, and dimensions. `GET /v1/posters?limit=20&offset=0` lists owned jobs.
+- `DELETE /v1/posters/{id}` cancels queued work or deletes terminal copy and output. It revokes output links. Running provider calls cannot safely be cancelled. A minimal tombstone remains for account-scoped idempotency.
+- Use the **same** `Idempotency-Key` for a retry of the same POST. Reusing it with different content returns 409. Even after expiry/deletion, reusing it returns the tombstone instead of generating another billable image. Submit a new key only when you intentionally want a new generation.
+- States: `queued → running → completed/failed/unknown`, then `expired` or `deleted`. Queued jobs resume after restart. Running jobs interrupted by a restart become `unknown`; they are never automatically regenerated. Check provider usage before explicitly creating another job. Unknown outcomes count against the monthly allowance.
+- Two artwork jobs run by default, with a maximum of twenty outstanding poster jobs and one hundred retained inputs per account. Delete old jobs or let retention expire to free input capacity. Queued work reserves remaining monthly submission capacity. Image and poster calls share monthly quota and per-account concurrency. Queue acceptance does not guarantee provider capacity or remaining quota at execution time.
+- Outputs are private files under `data/posters`, not public static assets. Input/brand snapshots and webhook secrets are encrypted in SQLite. Retention cleanup runs while the app runs; after an offline period it resumes when the app starts. Backups must follow your own retention policy. Signed links are capability credentials: anyone holding a valid link can read that one file until expiry or deletion.
+
+### Signed webhooks
+
+Include the optional `webhook` object to receive `poster.completed`, `poster.failed`, or `poster.unknown`. URLs must be public HTTPS on port 443. DNS answers are checked and pinned for the socket; private, loopback, mapped private addresses, and redirects are blocked. Requests time out after ten seconds. Only webhook delivery is retried, at most five total attempts, with 5/30/120/600-second retry delays. Event IDs are stable per job outcome; store them uniquely to deduplicate deliveries.
+
+Verify `X-ImageAPI-Signature: t=<unix-seconds>,v1=<hex-hmac>` against `HMAC-SHA256(secret, timestamp + "." + rawRequestBody)`, reject timestamps more than five minutes old, and compare signatures in constant time. A complete verifier is in `examples/verify-webhook.mjs`. Do not JSON-reserialize the body before checking the signature. Job responses expose webhook delivery state/attempt count, never its secret. HTTP redirects are not followed.
+
+### Typography and quality limits
+
+The compositor uses bundled, licensed fonts and vector glyph outlines at the final poster resolution. Text is never painted by the AI. Font fitting wraps without deleting words, selects readable sizes, anchors event details/CTA, and checks bounds, overlaps, and foreground contrast. Contrast ink is selected automatically for the paper and CTA colours; unbranded accent colours are sampled from the artwork. Latin, Greek, Cyrillic, Arabic, Sinhala, and Tamil glyphs are available; emoji and missing characters are rejected before a provider call. The bundled fonts have separate licenses in `server/assets/fonts`.
+
+The renderer produces consistent designed layouts, **not a guarantee that arbitrary artwork equals a professional human designer’s judgement**. Geometry/readability checks do not certify subject accuracy, flawless cropping, brand identity, or advertising correctness. Long copy that cannot fit at the minimum readable size fails preflight instead of silently truncating. Raster logo fidelity depends on the input; small logos are not enlarged. Review generated imagery before publishing. Backgrounds may be enlarged to the output canvas; the quality report flags this while typography remains full-resolution.
+
+### Local upgrade and operational settings
+
+This release leaves hosting unchanged. Back up `data/` and the encryption key, stop the old Node process, update the checkout, run `npm ci`, and start with your existing host/port/origin settings. Database v2 is automatically backed up under `data/backups/before-posters-*` and upgraded to v3 while preserving accounts and credentials. Do not start two application instances against the same SQLite data directory. Rollback across the schema upgrade requires restoring the full backup and key.
+
+- `IMAGEAPI_POSTER_WORKERS`: 1–4, default 2. The service remains a single Node/SQLite instance.
+- `IMAGEAPI_POSTER_STORAGE_MB`: output storage cap, default 512 MiB (32–10,240). Exports are serialized against this cap; storage exhaustion fails clearly and never silently deletes unexpired user files.
+- Existing `IMAGEAPI_DATA_DIR`, encryption key, provider limits, and public origin settings continue to apply. Keep durable local storage writable for the service owner.
+
+To render reproducible composition samples without making AI requests:
+
+```bash
+npm run poster:samples
+# Or supply an existing artwork PNG:
+npm run poster:samples -- --background /path/to/artwork.png --out /path/to/samples
+```
+
+These sample outputs demonstrate typography/layout only; the default artwork is a local illustration, not a live-provider result.

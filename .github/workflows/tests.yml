@@ -11,7 +11,20 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: Check formatting
+        run: |
+          npm run format:check || {
+            npm run format
+            git diff
+            exit 1
+          }
       - run: npm test
+      - run: npm run poster:samples
+      - uses: actions/upload-artifact@v4
+        with:
+          name: poster-composition-samples
+          path: poster-samples/
+          retention-days: 7
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
       - uses: actions/upload-artifact@v4
