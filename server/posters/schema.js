@@ -32,8 +32,19 @@ export const posterSchema = z
     subtitle: text(260).default(''),
     details: z.array(text(120).min(1)).max(5).default([]),
     cta: text(48).default(''),
+    offer: z
+      .object({
+        label: text(16).default('SAVE'),
+        value: text(12).min(1),
+        caption: text(28).default(''),
+      })
+      .strict()
+      .optional(),
+    features: z.array(text(36).min(1)).max(3).default([]),
     eyebrow: text(48).default(''),
-    layout: z.enum(['auto', 'editorial', 'bold', 'minimal', 'event', 'sale']).default('auto'),
+    layout: z
+      .enum(['auto', 'editorial', 'bold', 'minimal', 'event', 'sale', 'product'])
+      .default('auto'),
     size: z.enum(Object.keys(posterSizes)).default('portrait'),
     accent_color: colour.optional(),
     font: z.enum(fonts).optional(),
@@ -51,6 +62,12 @@ export const posterSchema = z
   .strict()
   .transform((body) => ({ ...body, model: body.model || providers[body.provider].default_model }))
   .superRefine((body, ctx) => {
+    if ((body.offer || body.features.length) && !['auto', 'product'].includes(body.layout))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['layout'],
+        message: 'Offers and feature rows require layout=product or auto',
+      });
     if (!providers[body.provider].models.includes(body.model))
       ctx.addIssue({
         code: 'custom',

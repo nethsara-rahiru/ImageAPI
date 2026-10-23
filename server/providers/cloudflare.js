@@ -18,7 +18,7 @@ export async function cloudflare(transport, credential, body) {
   const response = await transport.post(
     `https://api.cloudflare.com/client/v4/accounts/${saved.account_id}/ai/run/${body.model}`,
     { Authorization: `Bearer ${saved.api_key}` },
-    { prompt: body.prompt, steps: 4 },
+    { prompt: body.prompt, steps: body.steps === 8 ? 8 : 4 },
   );
   if (response.success === false)
     throw new HttpError(

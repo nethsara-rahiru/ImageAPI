@@ -7,6 +7,12 @@ export const posterSizes = {
 };
 export const layouts = [
   {
+    id: 'product',
+    name: 'Product campaign',
+    description:
+      'Full-bleed product artwork, integrated headlines, offer badges, feature icons, and luminous accents.',
+  },
+  {
     id: 'editorial',
     name: 'Editorial',
     description: 'Warm paper, generous margins, expressive serif typography.',

@@ -1,6 +1,6 @@
 {
   "name": "imageapi",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "description": "Automated poster studio with precise typography, per-user AI keys, durable jobs, and a vanilla JavaScript frontend.",
@@ -15,7 +15,8 @@
     "check": "node scripts/check.js",
     "format": "prettier --write server frontend tests scripts playwright.config.js examples",
     "format:check": "prettier --check server frontend tests scripts playwright.config.js examples",
-    "poster:samples": "node scripts/render-poster-samples.js"
+    "poster:samples": "node scripts/render-poster-samples.js",
+    "poster:product-sample": "node scripts/render-product-demo.js"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",

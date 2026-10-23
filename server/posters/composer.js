@@ -3,6 +3,9 @@ import { measure, validateCharacters } from './fonts.js';
 import { typeset, fitBlock, contrast } from './typography.js';
 import { planPoster } from './planner.js';
 import { artworkAccent } from './palette.js';
+import { logoOverlay } from './branding.js';
+import { productTypeset } from './product-type.js';
+import { composeProduct } from './product-composer.js';
 import { HttpError } from '../lib/errors.js';
 const rect = (x, y, width, height, fill, rx = 0) =>
   `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${rx}" fill="${fill}"/>`;
@@ -15,12 +18,20 @@ export function preflightPoster(body, brand) {
       ...body.details,
       body.cta,
       body.eyebrow,
+      ...(body.features || []),
+      body.offer?.label || '',
+      body.offer?.value || '',
+      body.offer?.caption || '',
       brand?.name || '',
       brand?.tagline || '',
     ],
     plan.family,
   );
-  return { plan, blocks: typeset(body, plan) };
+  return {
+    plan,
+    blocks:
+      plan.layout === 'product' ? productTypeset(body, plan, brand).blocks : typeset(body, plan),
+  };
 }
 export async function composePoster(image, body, brand) {
   const autoAccent = !body.accent_color && !brand?.accent_color;
@@ -29,11 +40,19 @@ export async function composePoster(image, body, brand) {
         ...body,
         accent_color: await artworkAccent(
           image.encoded,
-          ['bold', 'event'].includes(planPoster(body, brand).layout),
+          ['bold', 'event', 'product'].includes(planPoster(body, brand).layout),
         ),
       }
     : body;
+  if (planPoster(body, brand).layout === 'product' && autoAccent) {
+    const rgb = selected.accent_color
+      .slice(1)
+      .match(/../g)
+      .map((v) => parseInt(v, 16));
+    if (Math.max(...rgb) - Math.min(...rgb) < 25) selected.accent_color = '#28e7f2';
+  }
   const { plan, blocks } = preflightPoster(selected, brand);
+  if (plan.layout === 'product') return composeProduct(image, selected, brand, plan, autoAccent);
   const { width: w, height: h, art, margin: m, accent, foreground, background } = plan;
   const u = Math.min(w, h) / 1080;
   const svg = [];
@@ -146,36 +165,8 @@ export async function composePoster(image, body, brand) {
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${vector.join('')}</svg>`,
   );
   overlays.push({ input: overlay, left: 0, top: 0 });
-  if (brand?.logo) {
-    const logoWidth = Math.round(200 * u),
-      logoHeight = Math.round(80 * u);
-    const rawLogo = Buffer.from(brand.logo, 'base64');
-    const sample = await sharp(rawLogo)
-      .resize(64, 64, { fit: 'inside' })
-      .ensureAlpha()
-      .raw()
-      .toBuffer();
-    let light = 0,
-      alpha = 0;
-    for (let index = 0; index < sample.length; index += 4) {
-      const a = sample[index + 3] / 255;
-      light +=
-        (sample[index] * 0.2126 + sample[index + 1] * 0.7152 + sample[index + 2] * 0.0722) * a;
-      alpha += a;
-    }
-    const panel = alpha && light / alpha > 180 ? '#15212d' : '#ffffff';
-    const logo = await sharp(rawLogo)
-      .resize(logoWidth - 24, logoHeight - 24, {
-        fit: 'contain',
-        background: panel,
-        withoutEnlargement: true,
-      })
-      .flatten({ background: panel })
-      .extend({ top: 12, bottom: 12, left: 12, right: 12, background: panel })
-      .png()
-      .toBuffer();
-    overlays.push({ input: logo, left: w - m - logoWidth, top: Math.round(m) });
-  }
+  const logo = await logoOverlay(brand, w, m, u);
+  if (logo) overlays.push(logo);
   const rendered = await sharp(base).composite(overlays).png().toBuffer();
   const warnings = [];
   if (image.width < art.width || image.height < art.height)

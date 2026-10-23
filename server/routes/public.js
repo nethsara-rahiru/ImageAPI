@@ -5,7 +5,7 @@ import { openapi } from '../config/openapi.js';
 export function publicRoutes() {
   const router = Router();
   router.get('/health', (req, res) =>
-    res.json({ status: 'ok', version: '2.0.0', runtime: 'node' }),
+    res.json({ status: 'ok', version: '2.1.0', runtime: 'node' }),
   );
   router.get('/api/catalog', (req, res) => res.json({ providers: providerCatalog() }));
   router.get('/api/plans', (req, res) =>

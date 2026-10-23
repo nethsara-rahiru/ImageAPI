@@ -61,6 +61,22 @@ export async function render() {
             rejected rather than cut off. Artwork subject accuracy and logo identity still need
             review before publishing.
           </p>
+          <h3>Product campaigns</h3>
+          <p>
+            For full-bleed commercial posters, use <code>layout: "product"</code>. Add an optional
+            <code>offer: { label: "SAVE", value: "25%" }</code> and up to three exact
+            <code>features</code> strings. The renderer places a hero product, smooth dark contrast
+            veils, an offer badge, feature icons, and a rounded CTA. The AI receives a text-free
+            artwork direction, while the compositor renders every word exactly.
+            <code>auto</code> also selects this direction for product prompts or offer/feature
+            fields.
+          </p>
+          <p>
+            Example request: see <code>examples/speaker-promotion.json</code>. Product photos still
+            depend on the selected AI provider; the renderer cannot guarantee real product identity
+            or turn a low-quality source photo into premium photography. The local product sample
+            script uses labelled fixture artwork and does not make an AI-provider call.
+          </p>
           <h3>Reusable brand profiles</h3>
           <p>
             Save up to ten profiles with <code>POST /v1/brands</code> or the

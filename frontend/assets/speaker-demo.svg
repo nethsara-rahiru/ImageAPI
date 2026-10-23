@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+<defs>
+<radialGradient id="ambient"><stop stop-color="#175363"/><stop offset="1" stop-color="#030b13"/></radialGradient>
+<linearGradient id="body" x2="0.3" y2="1"><stop stop-color="#314453"/><stop offset=".4" stop-color="#13212d"/><stop offset=".8" stop-color="#06111c"/><stop offset="1" stop-color="#1e3a45"/></linearGradient>
+<linearGradient id="stone" x2="0" y2="1"><stop stop-color="#233e49"/><stop offset="1" stop-color="#030a12"/></linearGradient>
+<pattern id="mesh" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="2" fill="#47616b"/><circle cx="9" cy="9" r="2" fill="#020b13"/></pattern>
+<filter id="glow"><feGaussianBlur stdDeviation="12"/></filter>
+<clipPath id="grille"><rect x="180" y="290" width="650" height="340" rx="85"/></clipPath>
+</defs>
+<rect width="1200" height="900" fill="url(#ambient)"/>
+<ellipse cx="640" cy="685" rx="480" ry="65" fill="#16d7e7" opacity=".2" filter="url(#glow)"/>
+<path d="m95 655 835-80 205 112-158 127-887-65Z" fill="url(#stone)"/><path d="m95 655 835-80 205 112-875 70Z" fill="#25404a"/>
+<g transform="rotate(8 600 460)">
+<path d="M869 280c15-130 150-140 157-55 3 55-63 101-116 107" stroke="#182e3a" stroke-width="28" fill="none"/>
+<rect x="180" y="290" width="650" height="340" rx="85" fill="url(#body)" stroke="#34505e" stroke-width="4"/>
+<rect x="180" y="290" width="650" height="340" fill="url(#mesh)" opacity=".65" clip-path="url(#grille)"/>
+<ellipse cx="835" cy="460" rx="120" ry="171" fill="#07131d" stroke="#254554" stroke-width="8"/>
+<ellipse cx="841" cy="460" rx="83" ry="127" fill="none" stroke="#1ae3f4" stroke-width="16" opacity=".6" filter="url(#glow)"/>
+<ellipse cx="841" cy="460" rx="83" ry="127" fill="none" stroke="#36f1ff" stroke-width="7"/>
+<ellipse cx="841" cy="460" rx="63" ry="102" fill="#12222d" stroke="#29414e" stroke-width="3"/>
+<path d="M300 298h300" stroke="#76a8b7" stroke-opacity=".6" stroke-width="5"/>
+<path d="M420 307h20m40-9v18m-9-9h18m40-3 14 9-14 9" stroke="#06101a" stroke-width="5" fill="none"/>
+</g>
+</svg>
