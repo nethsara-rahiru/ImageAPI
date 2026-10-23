@@ -14,6 +14,19 @@ const sample = {
   cta: 'DISCOVER THE EXHIBITION',
   eyebrow: 'A NEW PERSPECTIVE',
 };
+const productExample = {
+  prompt:
+    'Premium portable Bluetooth speaker on a sculptural stone pedestal, cyan rim lighting, dark atmospheric studio, realistic woven fabric texture, complete product silhouette centred with breathing room',
+  headline: 'BIG SOUND.\nANYWHERE.',
+  subtitle: 'Portable Bluetooth Speaker',
+  eyebrow: 'NOVA AUDIO',
+  details: '',
+  cta: 'SHOP THE SOUND',
+  features: 'Wireless freedom\nDeep bass\nCompact design',
+  offer_label: 'SAVE',
+  offer_value: '25%',
+  offer_caption: '',
+};
 const options = (items, selected) =>
   items
     .map(
@@ -41,11 +54,12 @@ export async function render() {
       `${pageHeading('From idea to finished poster.', 'Exact words. Considered typography. Your artwork, automatically composed.', '<a href="/brands" data-link class="btn btn-secondary">' + icon('layers') + ' Brand profiles</a>')}
       <div class="poster-studio"><section class="card poster-controls"><div class="card-head"><div><h3>Make something worth sharing.</h3><p class="small muted">Artwork is generated. Your words are typeset precisely.</p></div>${icon('sparkles')}</div>
       <form id="poster-form" class="card-body"><div class="field"><label for="poster-prompt">Artwork direction</label><textarea id="poster-prompt" name="prompt" maxlength="4000" required placeholder="Describe the subject, mood, lighting, and visual style. Leave the wording to the fields below."></textarea></div>
-      <button type="button" class="text-link" data-poster-example>Start with an example ${icon('arrow')}</button>
-      <div class="field"><label for="poster-headline">Exact headline</label><input id="poster-headline" name="headline" maxlength="160" required placeholder="Your main message" /></div>
+      <button type="button" class="text-link" data-poster-example>Start with an example ${icon('arrow')}</button><button type="button" class="text-link" data-product-example>Try a product promotion ${icon('arrow')}</button>
+      <div class="field"><label for="poster-headline">Exact headline</label><textarea id="poster-headline" name="headline" maxlength="160" required placeholder="Your main message" rows="2"></textarea></div>
       <div class="field"><label for="poster-subtitle">Subtitle</label><textarea id="poster-subtitle" name="subtitle" maxlength="260" placeholder="A little more context"></textarea></div>
       <div class="field"><label for="poster-details">Dates, place, and details</label><textarea id="poster-details" name="details" maxlength="604" placeholder="One detail per line · up to five lines"></textarea></div>
       <div class="field-row"><div class="field"><label for="poster-eyebrow">Small heading</label><input id="poster-eyebrow" name="eyebrow" maxlength="48" placeholder="Optional category or introduction" /></div><div class="field"><label for="poster-cta">Call to action</label><input id="poster-cta" name="cta" maxlength="48" placeholder="BOOK YOUR PLACE" /></div></div>
+      <fieldset class="product-options"><legend>Product promotion</legend><p class="small muted">Optional. An offer or feature row selects the full-bleed product layout automatically. Enter only claims and discounts that apply to your product.</p><div class="field-row"><div class="field"><label for="offer-label">Offer label</label><input id="offer-label" name="offer_label" maxlength="16" placeholder="SAVE" /></div><div class="field"><label for="offer-value">Offer value</label><input id="offer-value" name="offer_value" maxlength="12" placeholder="25%" /></div></div><div class="field"><label for="offer-caption">Offer caption</label><input id="offer-caption" name="offer_caption" maxlength="28" placeholder="Optional short qualifier" /></div><div class="field"><label for="poster-features">Product features</label><textarea id="poster-features" name="features" maxlength="110" placeholder="Up to three short features, one per line"></textarea></div></fieldset>
       <div class="field"><label for="poster-brand">Brand profile</label><select id="poster-brand" name="brand_id"><option value="">No saved brand</option>${options(brands.map((b) => [b.id, b.name]))}</select><small>Saved logo, colours, and typography are applied automatically. <a href="/brands" data-link>Manage brands</a>.</small></div>
       <div class="field-row"><div class="field"><label for="poster-layout">Design direction</label><select id="poster-layout" name="layout"><option value="auto">Choose automatically</option>${options(catalog.layouts.map((l) => [l.id, l.name]))}</select></div><div class="field"><label for="poster-size">Poster size</label><select id="poster-size" name="size">${options(
         Object.entries(catalog.sizes).map(([id, s]) => [id, s.label]),
@@ -91,7 +105,17 @@ export async function render() {
       form.querySelector('[data-poster-example]').addEventListener('click', () => {
         for (const [key, value] of Object.entries(sample)) form.elements[key].value = value;
         form.elements.layout.value = 'editorial';
+        for (const field of ['features', 'offer_label', 'offer_value', 'offer_caption'])
+          form.elements[field].value = '';
       });
+      form.querySelector('[data-product-example]').addEventListener('click', () => {
+        for (const [key, value] of Object.entries(productExample)) form.elements[key].value = value;
+        form.elements.layout.value = 'product';
+      });
+      for (const name of ['offer_value', 'features'])
+        form.elements[name].addEventListener('input', () => {
+          if (form.elements[name].value.trim()) form.elements.layout.value = 'product';
+        });
       function show(job) {
         current = job.id;
         status.textContent = job.stage.replaceAll('_', ' ').toUpperCase();
@@ -146,10 +170,14 @@ export async function render() {
         box.querySelectorAll('[data-copy-poster]').forEach((b) =>
           b.addEventListener('click', () => {
             const input = jobs.find((j) => j.id === b.dataset.copyPoster).input;
+            for (const name of ['features', 'offer_label', 'offer_value', 'offer_caption'])
+              form.elements[name].value = '';
             for (const [key, value] of Object.entries(input)) {
               if (form.elements[key])
                 form.elements[key].value = Array.isArray(value) ? value.join('\n') : value;
             }
+            for (const field of ['offer_label', 'offer_value', 'offer_caption'])
+              form.elements[field].value = input.offer?.[field.replace('offer_', '')] || '';
             updateProvider();
             form.elements.model.value = input.model;
             toast('Content copied. Creating again uses a new provider request.');
@@ -208,6 +236,20 @@ export async function render() {
           .split('\n')
           .map((s) => s.trim())
           .filter(Boolean);
+        body.features = body.features
+          .split('\n')
+          .map((value) => value.trim())
+          .filter(Boolean);
+        if (body.offer_value.trim())
+          body.offer = {
+            label: body.offer_label.trim() || 'SAVE',
+            value: body.offer_value.trim(),
+            caption: body.offer_caption.trim(),
+          };
+        delete body.offer_label;
+        delete body.offer_value;
+        delete body.offer_caption;
+        if ((body.offer || body.features.length) && body.layout === 'auto') body.layout = 'product';
         body.retention_hours = Number(body.retention_hours);
         if (!body.brand_id) delete body.brand_id;
         const encoded = JSON.stringify(body);

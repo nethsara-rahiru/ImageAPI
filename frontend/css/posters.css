@@ -213,3 +213,21 @@
     flex-direction: column;
   }
 }
+
+.product-options {
+  border: 1px solid var(--line);
+  padding: 18px;
+  border-radius: 12px;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.product-options legend {
+  font-weight: 600;
+  font-size: 13px;
+  padding: 0 8px;
+  color: #34536b;
+}
+.product-options p {
+  margin: 0;
+}

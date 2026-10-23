@@ -120,3 +120,76 @@ test('product jobs return real composed output through the same asynchronous API
   assert.equal((await sharp(image.body).metadata()).height, 1350);
   assert.equal(env.calls.length, 1);
 });
+
+test('Cloudflare product jobs request eight refinement steps through the saved user credential', async (t) => {
+  let calls = 0;
+  const env = setup(t, {
+      config: { jobInterval: 30 },
+      fetchImpl: async (url, options) => {
+        calls++;
+        assert.match(url, /api.cloudflare.com/);
+        assert.equal(JSON.parse(options.body).steps, 8);
+        assert.equal(options.headers.Authorization, 'Bearer fixture-product-cloudflare-key');
+        return Response.json({ success: true, result: { image: png.toString('base64') } });
+      },
+    }),
+    account = await register(env);
+  await session(env.agent, account, 'put', '/api/providers/cloudflare').send({
+    api_key: 'fixture-product-cloudflare-key',
+    account_id: 'a'.repeat(32),
+  });
+  const response = await session(env.agent, account, 'post', '/v1/posters').send({
+    ...input,
+    provider: 'cloudflare',
+  });
+  assert.equal(response.status, 202);
+  let job;
+  for (let i = 0; i < 150; i++) {
+    job = (await env.agent.get('/v1/posters/' + response.body.id)).body;
+    if (!['queued', 'running'].includes(job.status)) break;
+    await new Promise((r) => setTimeout(r, 35));
+  }
+  assert.equal(job.status, 'completed', JSON.stringify(job.error));
+  assert.equal(calls, 1);
+});
+
+test('empty new feature defaults preserve old idempotency hashes across upgrades', async (t) => {
+  const { hash } = await import('../../server/security/tokens.js');
+  const canonical = (value) =>
+    Array.isArray(value)
+      ? '[' + value.map(canonical).join(',') + ']'
+      : value && typeof value === 'object'
+        ? '{' +
+          Object.keys(value)
+            .sort()
+            .map((key) => JSON.stringify(key) + ':' + canonical(value[key]))
+            .join(',') +
+          '}'
+        : JSON.stringify(value);
+  const env = setup(t),
+    account = await register(env);
+  await connect(env, account);
+  await env.context.posterWorker.close();
+  const oldRequest = {
+    provider: 'openai',
+    prompt: 'A botanical garden',
+    headline: 'NATURE IN FOCUS',
+    layout: 'editorial',
+  };
+  const oldBody = posterSchema.parse(oldRequest);
+  delete oldBody.features;
+  const first = await session(env.agent, account, 'post', '/v1/posters')
+    .set('Idempotency-Key', 'before-product-upgrade')
+    .send(oldRequest);
+  assert.equal(first.status, 202);
+  assert.equal(
+    env.context.db.prepare('SELECT request_hash FROM poster_jobs WHERE id=?').get(first.body.id)
+      .request_hash,
+    hash(canonical(oldBody)),
+  );
+  const replay = await session(env.agent, account, 'post', '/v1/posters')
+    .set('Idempotency-Key', 'before-product-upgrade')
+    .send({ ...oldRequest, features: [] });
+  assert.equal(replay.status, 200);
+  assert.equal(replay.body.id, first.body.id);
+});

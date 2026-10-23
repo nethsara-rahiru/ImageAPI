@@ -1,0 +1,14 @@
+{
+  "provider": "cloudflare",
+  "prompt": "Premium portable Bluetooth speaker on a sculptural stone pedestal, cyan rim lighting, dark atmospheric studio, realistic woven fabric texture, complete product silhouette centred with breathing room",
+  "headline": "BIG SOUND.\nANYWHERE.",
+  "subtitle": "Portable Bluetooth Speaker",
+  "eyebrow": "NOVA AUDIO",
+  "offer": { "label": "SAVE", "value": "25%" },
+  "features": ["Wireless freedom", "Deep bass", "Compact design"],
+  "cta": "SHOP THE SOUND",
+  "accent_color": "#28e7f2",
+  "layout": "product",
+  "size": "portrait",
+  "retention_hours": 24
+}

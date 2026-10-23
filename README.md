@@ -23,7 +23,7 @@ For the existing Ubuntu VPS, upgrades, SSH tunnel, systemd, and HTTPS setup, see
 
 ## Features
 
-- Automatic finished posters: five design directions, exact vector typography, artwork-matched accents, saved brand profiles, raster logos, five canvas sizes, and readability checks.
+- Automatic finished posters: six design directions, exact vector typography, artwork-matched accents, saved brand profiles, raster logos, five canvas sizes, and readability checks.
 - Durable background jobs, account-scoped idempotency, signed short-lived downloads, configurable retention, and signed webhooks with delivery-only retries.
 - Email/password registration, login/logout, recovery codes, password changes, and account deletion.
 - Persistent SQLite accounts, sessions, API keys, provider credentials, and usage metadata.
@@ -255,7 +255,7 @@ A Gemini key restricted to browser HTTP referrers cannot authorize this backend�
 }
 ```
 
-The model defaults automatically when omitted. This model accepts at most 2,048 prompt characters and uses four inference steps. The documented model API has no width/height controls: ImageAPI offers native square output only and reports actual pixel dimensions; it does not send unsupported size parameters or upscale provider output. Other requested canvas sizes are rejected before a provider call. Output is verified and normalized to PNG like other providers. Failed calls do not consume ImageAPI’s monthly allowance.
+The model defaults automatically when omitted. This model accepts at most 2,048 prompt characters. Plain image and framed-poster requests use four inference steps; cinematic product posters use eight for more refinement, consuming more provider compute. The documented model API has no width/height controls: ImageAPI offers native square output only and reports actual pixel dimensions; it does not send unsupported size parameters or upscale provider output. Other requested canvas sizes are rejected before a provider call. Output is verified and normalized to PNG like other providers. Failed calls do not consume ImageAPI’s monthly allowance.
 
 Cloudflare offers 10,000 free Neurons per day, shared across Workers AI models; the number of images varies with compute usage. Provider limits and ImageAPI’s monthly allowance are separate. There is no platform-owned token or automatic fallback. No database migration or additional package is required for this integration.
 
@@ -304,7 +304,7 @@ IMAGEAPI_KEY=your_imageapi_key IMAGEAPI_BASE_URL=http://127.0.0.1:8080 node exam
 | `details` | Up to five strings, each 120 characters |
 | `eyebrow`, `cta` | Each up to 48 characters |
 | `provider`, `model` | Cloudflare by default; selected provider’s default model when omitted |
-| `layout` | `auto`, `editorial`, `minimal`, `bold`, `event`, `sale` |
+| `layout` | `auto`, `editorial`, `minimal`, `bold`, `event`, `sale`, `product` |
 | `size` | `square` 1080×1080; `portrait` 1080×1350 (default); `story` 1080×1920; `landscape` 1920×1080; `a4` 1654×2339 (about 141 dpi, not 300 dpi print output) |
 | `brand_id` | Optional owned brand profile; job takes an encrypted snapshot |
 | `accent_color`, `font` | Optional overrides; six-digit hex; `sans`/`display`/`serif` |
@@ -351,3 +351,42 @@ npm run poster:samples -- --background /path/to/artwork.png --out /path/to/sampl
 ```
 
 These sample outputs demonstrate typography/layout only; the default artwork is a local illustration, not a live-provider result.
+
+
+## Cinematic product campaigns
+
+Use `layout: "product"` for the integrated full-bleed product advertising style. The renderer places product artwork over a harmonised background, uses smooth dark veils to protect copy contrast, highlights the last headline line, and draws an optional luminous offer badge, feature icons, and a rounded CTA. The original editorial and framed layouts remain available.
+
+`auto` selects this direction for product prompts (for example Bluetooth speakers or headphones), or when offer/feature fields are present. Explicit non-product layouts reject offer/feature fields rather than silently dropping them. Only caller-supplied wording is used; discounts, battery claims, and specifications are never invented by the compositor.
+
+```json
+{
+  "provider": "cloudflare",
+  "prompt": "Premium portable Bluetooth speaker on a dark stone pedestal, cyan rim lighting, complete product silhouette, realistic studio product photography",
+  "headline": "BIG SOUND.\nANYWHERE.",
+  "subtitle": "Portable Bluetooth Speaker",
+  "eyebrow": "NOVA AUDIO",
+  "offer": { "label": "SAVE", "value": "25%" },
+  "features": ["Wireless freedom", "Deep bass", "Compact design"],
+  "cta": "SHOP THE SOUND",
+  "accent_color": "#28e7f2",
+  "layout": "product",
+  "size": "portrait"
+}
+```
+
+The sample brand and promotion are fictional. Offer limits: `label` 16 characters, `value` 12 required characters, optional `caption` 28 characters. Feature rows accept up to three labels of 36 characters each. Use real, verified commercial claims in production. The full request is available in `examples/speaker-promotion.json`.
+
+Poster Studio has corresponding offer/feature fields and a **Try a product promotion** button. All text remains vector typeset at output resolution. Dark accent colours are lightened for headline contrast while the CTA retains the requested brand colour. Product campaigns pass bounds, overlap, exact-copy, and conservative contrast checks at all supported canvas sizes. Source photo quality, product identity, and suitability for advertising still depend on the provider’s output.
+
+To exercise the actual local async API and download its composed PNG without spending provider credits:
+
+```bash
+npm run poster:product-sample
+# Optional existing, text-free artwork fixture:
+npm run poster:product-sample -- --background /path/to/product-art.png --out ./poster-samples
+```
+
+This command creates an isolated temporary app/account, uses a fixture at the provider transport boundary, submits a real poster job, polls completion, and downloads the PNG through the authenticated API. It removes its temporary database afterward. The default artwork is a bundled vector speaker illustration. The sample manifest labels its source; it is not a live Cloudflare generation test. CI publishes this sample alongside the other composition previews.
+
+Product campaigns use eight steps with Cloudflare FLUX Schnell (ordinary image calls retain four). The higher-step request consumes more of the provider’s daily compute allowance; it does not change ImageAPI’s one-image quota charge. Version 2.1 requires no additional database migration beyond the existing v3 schema.

@@ -183,6 +183,24 @@ export const posterSchemas = {
         items: { type: 'string', minLength: 1, maxLength: 120 },
       },
       cta: { type: 'string', maxLength: 48 },
+      features: {
+        type: 'array',
+        maxItems: 3,
+        items: { type: 'string', minLength: 1, maxLength: 36 },
+        description: 'Exact feature labels, composed with icons. Requires product or auto layout.',
+      },
+      offer: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['value'],
+        properties: {
+          label: { type: 'string', maxLength: 16, default: 'SAVE' },
+          value: { type: 'string', minLength: 1, maxLength: 12 },
+          caption: { type: 'string', maxLength: 28 },
+        },
+        description:
+          'Exact promotional badge content. No discounts or product claims are invented.',
+      },
       eyebrow: { type: 'string', maxLength: 48 },
       provider: {
         type: 'string',
@@ -195,7 +213,7 @@ export const posterSchemas = {
       },
       layout: {
         type: 'string',
-        enum: ['auto', 'editorial', 'minimal', 'bold', 'event', 'sale'],
+        enum: ['auto', 'editorial', 'minimal', 'bold', 'event', 'sale', 'product'],
         default: 'auto',
       },
       size: {

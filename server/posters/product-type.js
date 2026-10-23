@@ -1,5 +1,5 @@
 import { fitBlock, inkFor, contrast } from './typography.js';
-import { outline } from './fonts.js';
+import { outline, measure } from './fonts.js';
 import { HttpError } from '../lib/errors.js';
 export function highlightColour(accent, backdrop) {
   let colour = accent;
@@ -83,7 +83,7 @@ export function productTypeset(body, plan, brand) {
         width: badge.width * 0.76,
         height: badge.height * 0.38,
       },
-      72,
+      90,
       26,
       'display',
       '#f8fbff',
@@ -191,5 +191,24 @@ export function productTypeset(body, plan, brand) {
       422,
       'This promotion has too much copy to leave a clear product area. Shorten the supporting text or use a taller canvas.',
     );
+  for (const block of blocks.filter((b) => b.key.startsWith('offer.'))) {
+    const usedWidth = Math.max(
+      ...block.lines.map((line) => measure(line, block.size, block.family)),
+    );
+    block.box.x += (block.box.width - usedWidth) / 2;
+    block.box.width = usedWidth;
+    block.svg = block.lines
+      .map((line, i) =>
+        outline(
+          line,
+          block.box.x + (usedWidth - measure(line, block.size, block.family)) / 2,
+          block.box.y + block.baselines[i],
+          block.size,
+          block.family,
+          block.fill,
+        ),
+      )
+      .join('');
+  }
   return { blocks, headline, headerBottom, footerTop, features };
 }

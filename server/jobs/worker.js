@@ -64,6 +64,7 @@ export function startPosterWorker(ctx) {
         prompt: artworkPrompt(body, plan),
         size,
         quality: 'auto',
+        ...(body.provider === 'cloudflare' && plan.layout === 'product' ? { steps: 8 } : {}),
       };
       usageId = reserve(ctx, { userId: row.user_id, keyId: row.api_key_id }, generation);
       ctx.db.prepare('UPDATE poster_jobs SET usage_id=? WHERE id=?').run(usageId, row.id);
@@ -200,7 +201,11 @@ export function startPosterWorker(ctx) {
   const activeDeliveries = new Set();
   const timer = setInterval(() => tick().catch(() => {}), ctx.config.jobInterval).unref();
   return {
-    kick: () => tick(),
+    async kick() {
+      // An explicit kick must perform a fresh pass, even if a timer pass was already in flight.
+      while (ticking && !stopped) await new Promise((resolve) => setTimeout(resolve, 10));
+      return tick();
+    },
     async close() {
       stopped = true;
       clearInterval(timer);

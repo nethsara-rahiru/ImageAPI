@@ -1,0 +1,186 @@
+{
+  "source": "Local asynchronous API demo with fixture artwork; no live provider call",
+  "artwork": "User-supplied local artwork fixture",
+  "request_id": "req_ec52b52369399cbbde0a7784",
+  "design": {
+    "layout": "product",
+    "full_bleed": true,
+    "font": "display",
+    "accent_color": "#28e7f2",
+    "headline_accent_color": "#28e7f2",
+    "background_color": "#050d16",
+    "palette_source": "brand_or_request",
+    "width": 1080,
+    "height": 1350,
+    "hero_area": {
+      "x": 0,
+      "y": 432,
+      "width": 1080,
+      "height": 662
+    },
+    "text": [
+      {
+        "field": "headline",
+        "text": "BIG SOUND.\nANYWHERE.",
+        "font_size": 109,
+        "lines": [
+          "BIG SOUND.",
+          "ANYWHERE."
+        ],
+        "box": {
+          "x": 70,
+          "y": 155,
+          "width": 670,
+          "height": 257.24
+        }
+      },
+      {
+        "field": "subtitle",
+        "text": "Portable Bluetooth Speaker",
+        "font_size": 32,
+        "lines": [
+          "Portable Bluetooth Speaker"
+        ],
+        "box": {
+          "x": 70,
+          "y": 428.24,
+          "width": 670,
+          "height": 37.76
+        }
+      },
+      {
+        "field": "eyebrow",
+        "text": "NOVA AUDIO",
+        "font_size": 25,
+        "lines": [
+          "NOVA AUDIO"
+        ],
+        "box": {
+          "x": 70,
+          "y": 63,
+          "width": 720,
+          "height": 29.5
+        }
+      },
+      {
+        "field": "offer.label",
+        "text": "SAVE",
+        "font_size": 24,
+        "lines": [
+          "SAVE"
+        ],
+        "box": {
+          "x": 858.951171875,
+          "y": 203,
+          "width": 62.09765625,
+          "height": 28.32
+        }
+      },
+      {
+        "field": "offer.value",
+        "text": "25%",
+        "font_size": 77,
+        "lines": [
+          "25%"
+        ],
+        "box": {
+          "x": 807.09716796875,
+          "y": 243.8,
+          "width": 165.8056640625,
+          "height": 90.86
+        }
+      },
+      {
+        "field": "cta",
+        "text": "SHOP THE SOUND",
+        "font_size": 28,
+        "lines": [
+          "SHOP THE SOUND"
+        ],
+        "box": {
+          "x": 100,
+          "y": 1232,
+          "width": 690,
+          "height": 33.04
+        }
+      },
+      {
+        "field": "features.0",
+        "text": "Wireless freedom",
+        "font_size": 23,
+        "lines": [
+          "Wireless freedom"
+        ],
+        "box": {
+          "x": 122,
+          "y": 1136,
+          "width": 245.33333333333331,
+          "height": 27.139999999999997
+        }
+      },
+      {
+        "field": "features.1",
+        "text": "Deep bass",
+        "font_size": 23,
+        "lines": [
+          "Deep bass"
+        ],
+        "box": {
+          "x": 435.3333333333333,
+          "y": 1136,
+          "width": 245.33333333333331,
+          "height": 27.139999999999997
+        }
+      },
+      {
+        "field": "features.2",
+        "text": "Compact design",
+        "font_size": 23,
+        "lines": [
+          "Compact design"
+        ],
+        "box": {
+          "x": 748.6666666666666,
+          "y": 1136,
+          "width": 245.33333333333331,
+          "height": 27.139999999999997
+        }
+      }
+    ],
+    "quality": {
+      "passed": true,
+      "checks": {
+        "all_text_preserved": true,
+        "no_text_overflow": true,
+        "no_text_overlap": true,
+        "readable_font_sizes": true,
+        "text_contrast": 9.78,
+        "cta_contrast": 11.4,
+        "contrast_method": "Minimum 90% dark veils behind copy, with a conservative white-artwork contrast bound.",
+        "canvas": {
+          "width": 1080,
+          "height": 1350
+        }
+      },
+      "warnings": [
+        "Product artwork was enlarged; typography is rendered at final output resolution."
+      ],
+      "scope": "Deterministic exact-copy, geometry, and conservative contrast checks. Product appearance and source artwork quality depend on the supplied image provider."
+    },
+    "formats": {
+      "png": {
+        "bytes": 1465712,
+        "mime_type": "image/png"
+      },
+      "jpeg": {
+        "bytes": 391756,
+        "mime_type": "image/jpeg"
+      },
+      "webp": {
+        "bytes": 226282,
+        "mime_type": "image/webp"
+      }
+    },
+    "preferred_format": "png"
+  }
+}
