@@ -1,8 +1,17 @@
+import { productGeometry } from './product-plan.js';
 import { inkFor } from './typography.js';
 import { posterSizes } from './catalog.js';
 export function chooseLayout(body) {
   if (body.layout !== 'auto') return body.layout;
   const words = `${body.prompt} ${body.headline}`.toLowerCase();
+  if (
+    body.offer ||
+    body.features?.length ||
+    /\b(speaker|headphones|earbuds|smartwatch|bluetooth|product|gadget|skincare|perfume|sneaker)\b/.test(
+      words,
+    )
+  )
+    return 'product';
   if (/\b(sale|discount|offer|shop|launch|buy)\b|%/.test(words)) return 'sale';
   if (/\b(concert|festival|event|party|music|conference|workshop)\b/.test(words)) return 'event';
   if (
@@ -25,9 +34,10 @@ export function planPoster(body, brand) {
       minimal: '#355b4d',
       event: '#a9caff',
       sale: '#ed492e',
+      product: '#28e7f2',
     }[layout];
   const paper = brand?.background_color || (layout === 'minimal' ? '#f1f3ed' : '#f8f3e9');
-  const dark = ['bold', 'event'].includes(layout),
+  const dark = ['bold', 'event', 'product'].includes(layout),
     background = dark ? '#101b29' : paper,
     foreground = inkFor(background);
   const margin = Math.round(Math.min(w, h) * 0.065);
@@ -66,9 +76,19 @@ export function planPoster(body, brand) {
     family,
     dark,
     landscape,
+    ...(layout === 'product'
+      ? { geometry: productGeometry(w, h, margin, Boolean(body.offer)) }
+      : {}),
   };
 }
 export function artworkPrompt(body, plan) {
+  if (plan.layout === 'product') {
+    const direction = plan.landscape
+      ? 'One isolated central hero product, with breathing room around the complete silhouette. Keep the subject within the middle 65 percent of the frame.'
+      : 'Product centred in the MIDDLE 35 percent of the frame; dark empty negative space across the TOP 30 percent and BOTTOM 20 percent for typesetting.';
+    const guide = `Premium commercial product photography. NO text, letters, logos, badges, icons, watermarks, or advertising copy. One hero product on a sculptural dark pedestal, dramatic ${plan.accent} rim lighting, tactile materials, realistic shadows, atmospheric charcoal studio background, refined colour grading. ${direction} Keep the complete product within the central 65 percent of the image width, with breathing room. The background should fade into near-black at the edges. Product art direction: `;
+    return (guide + body.prompt).slice(0, body.provider === 'cloudflare' ? 2048 : 6000);
+  }
   const palette = plan.dark
     ? 'cinematic rich shadows and luminous accents'
     : 'refined natural light and carefully balanced tones';

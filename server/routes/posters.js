@@ -61,7 +61,9 @@ export function posters(ctx) {
   });
   router.post('/', async (req, res) => {
     const body = parse(posterSchema, req.body);
-    const requestHash = hash(canonical(body));
+    const hashBody = { ...body };
+    if (!hashBody.features?.length) delete hashBody.features;
+    const requestHash = hash(canonical(hashBody));
     const idempotency = req.get('Idempotency-Key') || null;
     if (idempotency && !/^[A-Za-z0-9_.:-]{8,128}$/.test(idempotency))
       throw new HttpError(
